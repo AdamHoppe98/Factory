@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+.mcp.json
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Runner state and worktrees
+runner/state/
+runner/worktrees/
+runner/logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
