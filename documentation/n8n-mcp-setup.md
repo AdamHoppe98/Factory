@@ -35,13 +35,14 @@ claude mcp add n8n-mcp --scope local \
   -e MCP_MODE=stdio \
   -e LOG_LEVEL=error \
   -e DISABLE_CONSOLE_OUTPUT=true \
+  -e N8N_MCP_TELEMETRY_DISABLED=true \
   -e N8N_API_URL=http://localhost:5678 \
   -e N8N_API_KEY="$N8N_KEY" \
   -- npx -y n8n-mcp
 unset N8N_KEY
 ```
 
-(`read -s "VAR?prompt"` is zsh syntax. In bash, use `read -s -p "n8n API key: " N8N_KEY`.)
+`read -s` pauses and asks for the key: paste it and press Enter (nothing shows while you paste). Or skip the `read` line and write the key directly in place of `"$N8N_KEY"`. That works too, but the key then ends up in `~/.zsh_history`.
 
 ### 3. Verify
 ```bash
@@ -51,6 +52,7 @@ Then **restart Claude Code** in this folder and ask: *"Use the n8n MCP to run a 
 You should see the `n8n_health_check` and `n8n_list_workflows` tools being used.
 
 ### Troubleshooting
+- **"Failed to connect — Request timed out":** the first `npx` run downloads the package, which can take longer than Claude waits. Run `npx -y n8n-mcp` once by hand (Ctrl-C when it starts), then check again. Also make sure `N8N_MCP_TELEMETRY_DISABLED=true` is set: without it, n8n-mcp prints a telemetry banner to stdout, the channel MCP messages use, which can break the handshake.
 - **401 / unauthorized:** the API key is wrong or expired. Remove the server and add it again (see below).
 - **Connection refused:** n8n isn't running. Start the container with `docker start n8n`.
 - **Remove and add again:** `claude mcp remove n8n-mcp --scope local`, then repeat step 2.
