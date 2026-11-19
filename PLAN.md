@@ -98,7 +98,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 
 ### Phase 0 – Setup
 - [x] **T0.1** Create the repo skeleton (folders above), `.gitignore`, a README stub and the first commit.
-- [ ] **T0.2** Write `scripts/setup-labels.sh` to create the 9 state labels with `gh`. Run it.
+- [x] **T0.2** Write `scripts/setup-labels.sh` to create the 9 state labels with `gh`. Run it.
 - [ ] **T0.3** Write `documentation/n8n-mcp-setup.md`, a step-by-step guide for adding the n8n MCP server to Claude Code in this project (n8n API key, `claude mcp add`, keep secrets out of git, verify it can list workflows). Adam follows the guide.
 - [ ] **T0.4** n8n prerequisites: a GitHub credential in n8n, and Ollama reachable from n8n at `host.docker.internal:11434`. Run a smoke test.
 - [ ] **T0.5** Add AdamAddon as a subtree in `projects/AdamAddon`. *Blocked until Adam pushes the changes from his home PC to AdamAddon.*

@@ -29,3 +29,7 @@ Format: date – question / decision – answer – why.
 
 ## 2026-11-19 – Plan approved
 Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a copied config.
+
+## 2026-11-19 – T0.2 labels
+- Label colors follow the assignment diagram: orange = Adam acts, purple = AI works, pink = n8n moves the task. The script uses `--force`, so it is safe to re-run.
+- GitHub's default labels (bug, enhancement, …) are kept. They aren't states, and n8n ignores them.
