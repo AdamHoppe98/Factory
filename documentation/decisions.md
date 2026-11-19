@@ -33,3 +33,8 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 ## 2026-11-19 – T0.2 labels
 - Label colors follow the assignment diagram: orange = Adam acts, purple = AI works, pink = n8n moves the task. The script uses `--force`, so it is safe to re-run.
 - GitHub's default labels (bug, enhancement, …) are kept. They aren't states, and n8n ignores them.
+
+## 2026-11-19 – T0.3 n8n MCP
+- Recommended MCP: the community `n8n-mcp` (npx, n8n API key). It can create and update workflows and knows the n8n node schemas. n8n's built-in MCP (n8n 2.44.4) is documented as an alternative, since it is aimed at running workflows.
+- The MCP is added with `claude mcp add --scope local`, so the key stays in `~/.claude.json` and out of the repo.
+- Checked: Ollama is reachable from the n8n container at `host.docker.internal:11434` (part of T0.4).
