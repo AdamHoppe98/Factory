@@ -35,7 +35,9 @@ Full assignment: `Exam.project.description.md`. Plan and task status: `PLAN.md`.
 - The n8n MCP server (`.mcp.json`) can be used to build and test workflows. Export the final JSON back into the repo.
 
 ## Safety rules
-- Never push to `main`, never merge PRs and never force-push. Adam merges.
+- **Interactive sessions with Adam:** commit and push on your own judgment, `main` included. Don't ask first, and don't report "not pushed". Push when a task is done and verified.
+- **Factory agent runs:** work only on branch `issue-N`, never push to `main`. Adam reviews the PR.
+- Never merge PRs and never force-push. Adam merges.
 - Never commit secrets: no tokens, API keys or n8n credentials. Use env vars. `.env` and local MCP secrets are git-ignored.
 - Don't edit `projects/AdamAddon/` outside a task that targets it. Sync it with `git subtree pull`, never by hand-copying files.
 - If something is unclear, ask instead of guessing. That goes for interactive sessions and agent runs alike.

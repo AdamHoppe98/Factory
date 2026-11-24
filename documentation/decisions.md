@@ -73,3 +73,6 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Decision: WF1 calls Ollama with `think: true`. It follows the rules better (asks about the target and asks real questions). The cost is about 45–55 s per spec instead of 10–30 s, which is fine with polling every minute. Temperature 0.2.
 - Known limit: even with thinking, the model adds small unasked details (data persistence, "existing UI framework"). Adam's review in `Ready for approval` is the control for that. (Report: a small local model needs a human gate. The spec review is where it pays off.)
 - `scripts/try-refine.py` runs the prompt outside n8n. It can be reused later to compare qwen3:8b with the Claude API (Phase 3). Results: `documentation/examples/refine-example.md`.
+
+## 2026-11-24 – Commit and push rule
+- Adam: interactive Claude sessions may commit and push on their own judgment, `main` included. Why: this is an AI-focused project, and asking every time slows the work down. Factory agent runs still only push `issue-N` branches, and Adam still merges every PR. CLAUDE.md updated.
