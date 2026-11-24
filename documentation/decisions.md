@@ -64,3 +64,12 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - "Open questions" lets the AI step ask Adam questions inside the spec comment (assignment step 2). "None" means the spec is ready.
 - "Only change files inside the Target" is a fixed constraint in every spec (D4).
 - The issue template auto-applies the `Ideas` label, so a new idea enters the factory without a manual label step. Its fields (What, Why, Target) are optional hints. The AI step fills the gaps.
+
+## 2026-11-24 – T1.2 refine prompt
+- `prompts/refine.md` holds a `{{SPEC_TEMPLATE}}` placeholder, and the caller fills in `templates/spec-template.md`. The template then lives in one place only.
+- The prompt input has three parts: `ISSUE`, `PREVIOUS SPEC` and `COMMENTS`. The same prompt handles the first refine and every re-refine after Adam comments.
+- The prompt includes a short description of both projects with hard facts (runner port 8787, the 30-minute limit, the addon's `Features/` layout). Why: in v1, qwen3:8b made up port 8080 for the runner. Once the fact was in the prompt, it used 8787.
+- Rule "don't invent facts, write `Assumption:` and ask". Without thinking, qwen3:8b ignored it: a vague idea got "Open questions: None", and it picked a Target without asking.
+- Decision: WF1 calls Ollama with `think: true`. It follows the rules better (asks about the target and asks real questions). The cost is about 45–55 s per spec instead of 10–30 s, which is fine with polling every minute. Temperature 0.2.
+- Known limit: even with thinking, the model adds small unasked details (data persistence, "existing UI framework"). Adam's review in `Ready for approval` is the control for that. (Report: a small local model needs a human gate. The spec review is where it pays off.)
+- `scripts/try-refine.py` runs the prompt outside n8n. It can be reused later to compare qwen3:8b with the Claude API (Phase 3). Results: `documentation/examples/refine-example.md`.
