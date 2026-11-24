@@ -1,0 +1,757 @@
+local addonName, ns = ...
+
+-- The main window: a menu on the left with one entry per feature that has a page,
+-- and a content area on the right where the selected feature's page is shown.
+-- Drawn by hand (flat dark panels, violet-to-cyan accent) rather than with a Blizzard frame template.
+--
+-- Menu: pages with a navParent are grouped under that page. A group is folded until it is
+-- opened, and only one group is open at a time, so the list stays short as features are added.
+-- If it still doesn't fit, the menu scrolls (mouse wheel, or drag the thin bar on the right).
+
+local MainWindow = {}
+ns.MainWindow = MainWindow
+
+local WINDOW_WIDTH = 640
+local WINDOW_HEIGHT = 610
+local NAV_WIDTH = 150
+local NAV_BUTTON_HEIGHT = 22
+local TITLE_HEIGHT = 34
+local SIDEBAR_WIDTH = NAV_WIDTH + 14
+local NAV_WHEEL_STEP = NAV_BUTTON_HEIGHT * 2
+
+local FONT = "Interface\\AddOns\\" .. addonName .. "\\Media\\Fonts\\Expressway.ttf"
+
+local COLORS = {
+	background = { 0.055, 0.06, 0.075, 0.97 },
+	sidebar = { 0.035, 0.04, 0.05, 1 },
+	titleTop = { 0.10, 0.11, 0.145, 1 },
+	titleBottom = { 0.06, 0.065, 0.085, 1 },
+	border = { 0.18, 0.2, 0.26, 1 },
+	accentA = { 0.58, 0.36, 1 },  -- violet
+	accentB = { 0.2, 0.85, 1 },   -- cyan
+	text = { 0.78, 0.8, 0.86 },
+	textDim = { 0.5, 0.53, 0.6 },
+	textSelected = { 1, 1, 1 },
+	close = { 1, 0.35, 0.42 },
+}
+
+local frame
+local content
+local emptyText
+local navButtons = {}
+local pages = {}
+local currentPage
+
+-- Menu state
+local navScroll        -- ScrollFrame that clips the menu
+local navChild         -- its scroll child, holding the buttons
+local navThumb         -- scroll bar thumb, shown only when the menu overflows
+local navEntries = {}  -- top-level entries in menu order: { module, button, children = { entry, ... } or nil }
+local navGroups = {}   -- name -> entry, for top-level pages that have child pages
+local expandedGroup    -- name of the open group, or nil
+
+local function SavePosition()
+	local point, _, relativePoint, x, y = frame:GetPoint(1)
+	ns.db.window.point = { point, relativePoint, x, y }
+end
+
+local function RestorePosition()
+	frame:ClearAllPoints()
+	local saved = ns.db.window.point
+	if saved then
+		frame:SetPoint(saved[1], UIParent, saved[2], saved[3], saved[4])
+	else
+		frame:SetPoint("CENTER")
+	end
+end
+
+---------------------------------------------------------------------------
+-- Drawing helpers
+---------------------------------------------------------------------------
+
+local function Color(c, alpha)
+	return CreateColor(c[1], c[2], c[3], alpha or c[4] or 1)
+end
+
+local function SolidTexture(parent, layer, c, alpha, subLevel)
+	local tex = parent:CreateTexture(nil, layer, nil, subLevel)
+	tex:SetColorTexture(c[1], c[2], c[3], alpha or c[4] or 1)
+	return tex
+end
+
+-- Gradient from c1 to c2: left to right for "HORIZONTAL", bottom to top for "VERTICAL".
+local function GradientTexture(parent, layer, orientation, c1, a1, c2, a2, subLevel)
+	local tex = parent:CreateTexture(nil, layer, nil, subLevel)
+	tex:SetColorTexture(1, 1, 1, 1)
+	tex:SetGradient(orientation, Color(c1, a1), Color(c2, a2))
+	return tex
+end
+
+local function SetFont(fontString, size, c)
+	fontString:SetFont(FONT, size, "")
+	fontString:SetShadowOffset(1, -1)
+	fontString:SetShadowColor(0, 0, 0, 0.8)
+	if c then
+		fontString:SetTextColor(c[1], c[2], c[3])
+	end
+end
+
+-- A one-pixel line around `region`, inside its edges.
+local function AddBorder(parent, region, c, alpha)
+	local top = SolidTexture(parent, "BORDER", c, alpha)
+	top:SetPoint("TOPLEFT", region, "TOPLEFT")
+	top:SetPoint("TOPRIGHT", region, "TOPRIGHT")
+	PixelUtil.SetHeight(top, 1, 1)
+
+	local bottom = SolidTexture(parent, "BORDER", c, alpha)
+	bottom:SetPoint("BOTTOMLEFT", region, "BOTTOMLEFT")
+	bottom:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT")
+	PixelUtil.SetHeight(bottom, 1, 1)
+
+	local left = SolidTexture(parent, "BORDER", c, alpha)
+	left:SetPoint("TOPLEFT", region, "TOPLEFT")
+	left:SetPoint("BOTTOMLEFT", region, "BOTTOMLEFT")
+	PixelUtil.SetWidth(left, 1, 1)
+
+	local right = SolidTexture(parent, "BORDER", c, alpha)
+	right:SetPoint("TOPRIGHT", region, "TOPRIGHT")
+	right:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT")
+	PixelUtil.SetWidth(right, 1, 1)
+end
+
+-- A soft shadow: stacked black rings, each a little wider and fainter.
+local function AddShadow(target)
+	for i = 1, 8 do
+		local shadow = target:CreateTexture(nil, "BACKGROUND", nil, -8)
+		shadow:SetColorTexture(0, 0, 0, 0.07)
+		shadow:SetPoint("TOPLEFT", -i, i)
+		shadow:SetPoint("BOTTOMRIGHT", i, -i)
+	end
+end
+
+---------------------------------------------------------------------------
+-- Menu scrolling
+---------------------------------------------------------------------------
+
+local function NavScrollRange()
+	return math.max(0, navChild:GetHeight() - navScroll:GetHeight())
+end
+
+-- Scrolls the menu to `offset` (clamped) and moves the thumb to match.
+local function SetNavScroll(offset)
+	local range = NavScrollRange()
+	offset = math.max(0, math.min(range, offset or 0))
+	navScroll:SetVerticalScroll(offset)
+
+	local viewHeight = navScroll:GetHeight()
+	if range <= 0 or viewHeight <= 0 then
+		navThumb:Hide()
+		return
+	end
+
+	local thumbHeight = math.max(24, viewHeight * viewHeight / navChild:GetHeight())
+	navThumb:SetHeight(thumbHeight)
+	navThumb:ClearAllPoints()
+	navThumb:SetPoint("TOPRIGHT", navScroll, "TOPRIGHT", -2, -(offset / range) * (viewHeight - thumbHeight))
+	navThumb:Show()
+end
+
+-- Scrolls just enough to show the span from `top` to `bottom` (offsets from the top of the
+-- menu). If the span is taller than the menu, its top wins.
+local function ScrollNavTo(top, bottom)
+	local viewHeight = navScroll:GetHeight()
+	if viewHeight <= 0 then
+		return
+	end
+	local offset = navScroll:GetVerticalScroll()
+	if bottom > offset + viewHeight then
+		offset = bottom - viewHeight
+	end
+	if top < offset then
+		offset = top
+	end
+	SetNavScroll(offset)
+end
+
+local function CreateNavThumb(parent)
+	local thumb = CreateFrame("Frame", nil, parent)
+	thumb:SetWidth(3)
+	thumb:SetFrameLevel(parent:GetFrameLevel() + 10)
+	thumb:EnableMouse(true)
+	thumb:Hide()
+
+	local tex = SolidTexture(thumb, "OVERLAY", COLORS.textDim, 0.45)
+	tex:SetAllPoints()
+
+	thumb:SetScript("OnEnter", function()
+		tex:SetColorTexture(COLORS.accentB[1], COLORS.accentB[2], COLORS.accentB[3], 0.8)
+	end)
+	thumb:SetScript("OnLeave", function(self)
+		if not self.dragging then
+			tex:SetColorTexture(COLORS.textDim[1], COLORS.textDim[2], COLORS.textDim[3], 0.45)
+		end
+	end)
+
+	-- Drag: move the menu by the cursor's travel, scaled from the track to the content.
+	thumb:SetScript("OnMouseDown", function(self, mouseButton)
+		if mouseButton ~= "LeftButton" then
+			return
+		end
+		local _, cursorY = GetCursorPosition()
+		self.dragging = true
+		self.startY = cursorY / self:GetEffectiveScale()
+		self.startScroll = navScroll:GetVerticalScroll()
+		self:SetScript("OnUpdate", function(thumbSelf)
+			local _, y = GetCursorPosition()
+			y = y / thumbSelf:GetEffectiveScale()
+			local track = navScroll:GetHeight() - thumbSelf:GetHeight()
+			if track > 0 then
+				SetNavScroll(thumbSelf.startScroll + (thumbSelf.startY - y) * NavScrollRange() / track)
+			end
+		end)
+	end)
+	thumb:SetScript("OnMouseUp", function(self)
+		self.dragging = false
+		self:SetScript("OnUpdate", nil)
+		if not self:IsMouseOver() then
+			tex:SetColorTexture(COLORS.textDim[1], COLORS.textDim[2], COLORS.textDim[3], 0.45)
+		end
+	end)
+	return thumb
+end
+
+---------------------------------------------------------------------------
+-- Menu layout and selection
+---------------------------------------------------------------------------
+
+local function PlaceNavButton(button, y)
+	button:ClearAllPoints()
+	button:SetPoint("TOPLEFT", navChild, "TOPLEFT", 0, -y)
+	button:SetPoint("TOPRIGHT", navChild, "TOPRIGHT", 0, -y)
+	button.navY = y
+	button:Show()
+end
+
+-- ">" when folded, "v" when open. Two short rotated lines meeting at a point.
+local function SetChevron(button, open)
+	local a, b, anchor = button.ChevronA, button.ChevronB, button.ChevronAnchor
+	a:ClearAllPoints()
+	b:ClearAllPoints()
+	if open then
+		a:SetPoint("CENTER", anchor, "CENTER", -2, 0)
+		b:SetPoint("CENTER", anchor, "CENTER", 2, 0)
+	else
+		a:SetPoint("CENTER", anchor, "CENTER", 0, 2)
+		b:SetPoint("CENTER", anchor, "CENTER", 0, -2)
+	end
+	-- "\" then "/" works for both shapes; only the offsets differ.
+	a:SetRotation(math.rad(-45))
+	b:SetRotation(math.rad(45))
+	local c = open and COLORS.accentB or COLORS.textDim
+	a:SetColorTexture(c[1], c[2], c[3], 1)
+	b:SetColorTexture(c[1], c[2], c[3], 1)
+end
+
+-- Stacks the visible buttons from the top and sizes the scroll child to fit.
+local function LayoutNav()
+	local y = 0
+	for _, entry in ipairs(navEntries) do
+		PlaceNavButton(entry.button, y)
+		y = y + NAV_BUTTON_HEIGHT
+
+		if entry.children then
+			local open = expandedGroup == entry.module.name
+			SetChevron(entry.button, open)
+			entry.button.GroupBackground:SetShown(open)
+			for _, child in ipairs(entry.children) do
+				if open then
+					PlaceNavButton(child.button, y)
+					y = y + NAV_BUTTON_HEIGHT
+				else
+					child.button:Hide()
+				end
+			end
+		end
+	end
+	navChild:SetHeight(math.max(y, 1))
+	SetNavScroll(navScroll:GetVerticalScroll())
+end
+
+-- Highlights the current page. When it sits in a folded group, the group's header is
+-- highlighted instead, so you can still see where you are.
+local function RefreshSelection()
+	for _, entry in ipairs(navEntries) do
+		local name = entry.module.name
+		local selected = name == currentPage
+		if entry.children then
+			local childSelected = false
+			for _, child in ipairs(entry.children) do
+				local isCurrent = child.module.name == currentPage
+				child.button.Selected:SetShown(isCurrent)
+				childSelected = childSelected or isCurrent
+			end
+			if childSelected and expandedGroup ~= name then
+				selected = true
+			end
+		end
+		entry.button.Selected:SetShown(selected)
+	end
+end
+
+-- Keeps the current page's button on screen; when a group was just opened, tries to show
+-- the whole group.
+local function ScrollToCurrent()
+	local button = currentPage and navButtons[currentPage]
+	if not button or not button:IsShown() then
+		return
+	end
+	local top = button.navY
+	local bottom = top + NAV_BUTTON_HEIGHT
+	local group = navGroups[currentPage]
+	if group and expandedGroup == currentPage then
+		bottom = top + NAV_BUTTON_HEIGHT * (#group.children + 1)
+	end
+	ScrollNavTo(top, bottom)
+end
+
+local function RefreshNav()
+	LayoutNav()
+	RefreshSelection()
+	ScrollToCurrent()
+end
+
+---------------------------------------------------------------------------
+-- Pieces of the window
+---------------------------------------------------------------------------
+
+-- isChild: listed indented and smaller, inside a group. isGroup: a header with a chevron.
+local function CreateNavButton(parent, module, isChild, isGroup)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetHeight(NAV_BUTTON_HEIGHT)
+	button:Hide()
+
+	local hover = SolidTexture(button, "HIGHLIGHT", { 1, 1, 1 }, 0.05)
+	hover:SetAllPoints()
+
+	local normalColor = isChild and COLORS.textDim or COLORS.text
+
+	-- Open groups get a faint band behind the header and its children, with a thin guide
+	-- line on the left that runs down past the children.
+	if isGroup then
+		local groupBackground = SolidTexture(button, "BACKGROUND", { 1, 1, 1 }, 0.025)
+		groupBackground:SetAllPoints()
+		groupBackground:Hide()
+		button.GroupBackground = groupBackground
+	elseif isChild then
+		local band = SolidTexture(button, "BACKGROUND", { 1, 1, 1 }, 0.025)
+		band:SetAllPoints()
+		local guide = SolidTexture(button, "BORDER", COLORS.border)
+		guide:SetPoint("TOPLEFT", 13, 0)
+		guide:SetPoint("BOTTOMLEFT", 13, 0)
+		PixelUtil.SetWidth(guide, 1, 1)
+	end
+
+	-- Shown for the current page: an accent bar on the left and a glow fading right.
+	local selected = CreateFrame("Frame", nil, button)
+	selected:SetAllPoints()
+	selected:SetFrameLevel(button:GetFrameLevel() + 1)
+	local glow = GradientTexture(selected, "BACKGROUND", "HORIZONTAL", COLORS.accentA, 0.3, COLORS.accentA, 0)
+	glow:SetAllPoints()
+	local bar = GradientTexture(selected, "ARTWORK", "VERTICAL", COLORS.accentA, 1, COLORS.accentB, 1)
+	bar:SetPoint("TOPLEFT")
+	bar:SetPoint("BOTTOMLEFT")
+	bar:SetWidth(2)
+	selected:Hide()
+	button.Selected = selected
+
+	-- The label (and chevron) sit above the selection glow.
+	local textHolder = CreateFrame("Frame", nil, button)
+	textHolder:SetAllPoints()
+	textHolder:SetFrameLevel(button:GetFrameLevel() + 2)
+
+	button.Text = textHolder:CreateFontString(nil, "OVERLAY")
+	SetFont(button.Text, isChild and 12 or 14, normalColor)
+	button.Text:SetPoint("LEFT", isChild and 22 or 10, 0)
+	button.Text:SetPoint("RIGHT", isGroup and -24 or -10, 0)
+	button.Text:SetJustifyH("LEFT")
+	button.Text:SetWordWrap(false)
+	button.Text:SetText(module.title)
+
+	if isGroup then
+		local anchor = CreateFrame("Frame", nil, textHolder)
+		anchor:SetSize(10, 10)
+		anchor:SetPoint("RIGHT", -12, 0)
+		button.ChevronAnchor = anchor
+		button.ChevronA = textHolder:CreateTexture(nil, "OVERLAY")
+		button.ChevronA:SetSize(6, 2)
+		button.ChevronB = textHolder:CreateTexture(nil, "OVERLAY")
+		button.ChevronB:SetSize(6, 2)
+		SetChevron(button, false)
+	end
+
+	selected:SetScript("OnShow", function()
+		button.Text:SetTextColor(unpack(COLORS.textSelected))
+	end)
+	selected:SetScript("OnHide", function()
+		button.Text:SetTextColor(unpack(normalColor))
+	end)
+
+	button:SetScript("OnClick", function()
+		-- A second click on an open group's header, while on its page, folds it.
+		if isGroup and expandedGroup == module.name and currentPage == module.name then
+			expandedGroup = nil
+			RefreshNav()
+			return
+		end
+		MainWindow:ShowPage(module.name)
+	end)
+
+	navButtons[module.name] = button
+	return button
+end
+
+local function CreateCloseButton(parent)
+	local close = CreateFrame("Button", nil, parent)
+	close:SetSize(TITLE_HEIGHT, TITLE_HEIGHT)
+	close:SetPoint("TOPRIGHT")
+
+	local hover = SolidTexture(close, "BACKGROUND", COLORS.close, 0.15)
+	hover:SetAllPoints()
+	hover:Hide()
+
+	-- An X from two thin rotated lines.
+	local lines = {}
+	for i, angle in ipairs({ 45, -45 }) do
+		local line = SolidTexture(close, "ARTWORK", COLORS.textDim)
+		line:SetSize(14, 2)
+		line:SetPoint("CENTER")
+		line:SetRotation(math.rad(angle))
+		lines[i] = line
+	end
+
+	local function Paint(c)
+		for _, line in ipairs(lines) do
+			line:SetColorTexture(c[1], c[2], c[3], 1)
+		end
+	end
+
+	close:SetScript("OnEnter", function()
+		hover:Show()
+		Paint(COLORS.close)
+	end)
+	close:SetScript("OnLeave", function()
+		hover:Hide()
+		Paint(COLORS.textDim)
+	end)
+	close:SetScript("OnClick", function()
+		parent:Hide()
+	end)
+	return close
+end
+
+-- Flat button in the accent colour.
+local function CreateAccentButton(parent, width, height)
+	local button = CreateFrame("Button", nil, parent)
+	button:SetSize(width, height)
+
+	local bg = GradientTexture(button, "BACKGROUND", "HORIZONTAL", COLORS.accentA, 0.35, COLORS.accentB, 0.25)
+	bg:SetAllPoints()
+	AddBorder(button, button, COLORS.accentA, 0.8)
+
+	local hover = SolidTexture(button, "HIGHLIGHT", { 1, 1, 1 }, 0.1)
+	hover:SetAllPoints()
+
+	local text = button:CreateFontString(nil, "OVERLAY")
+	SetFont(text, 12, COLORS.textSelected)
+	text:SetPoint("CENTER")
+	button:SetFontString(text)
+	button:SetPushedTextOffset(1, -1)
+	return button
+end
+
+-- Builds the menu tree: top-level pages in sort order, each followed by the pages that
+-- name it as navParent. A navParent that has no page of its own is ignored (listed top level).
+local function BuildNav()
+	local sorted = ns:GetSortedModules()
+
+	local hasPage = {}
+	for _, module in ipairs(sorted) do
+		if module.CreatePage then
+			hasPage[module.name] = true
+		end
+	end
+
+	local topLevel, childrenOf = {}, {}
+	for _, module in ipairs(sorted) do
+		if module.CreatePage then
+			local parentName = module.navParent
+			if parentName and parentName ~= module.name and hasPage[parentName] then
+				childrenOf[parentName] = childrenOf[parentName] or {}
+				table.insert(childrenOf[parentName], module)
+			else
+				table.insert(topLevel, module)
+			end
+		end
+	end
+
+	for _, module in ipairs(topLevel) do
+		local children = childrenOf[module.name]
+		local entry = { module = module }
+		entry.button = CreateNavButton(navChild, module, false, children ~= nil)
+		if children then
+			entry.children = {}
+			for _, childModule in ipairs(children) do
+				table.insert(entry.children, {
+					module = childModule,
+					button = CreateNavButton(navChild, childModule, true, false),
+				})
+			end
+			navGroups[module.name] = entry
+		end
+		table.insert(navEntries, entry)
+	end
+
+	return #topLevel
+end
+
+---------------------------------------------------------------------------
+-- Window
+---------------------------------------------------------------------------
+
+local function BuildFrame()
+	frame = CreateFrame("Frame", "AdamAddonMainWindow", UIParent)
+	frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+	frame:SetFrameStrata("HIGH")
+	frame:SetToplevel(true)
+	frame:SetClampedToScreen(true)
+	frame:SetMovable(true)
+	frame:EnableMouse(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		SavePosition()
+	end)
+	frame:Hide()
+
+	-- Body
+	AddShadow(frame)
+	local background = SolidTexture(frame, "BACKGROUND", COLORS.background)
+	background:SetAllPoints()
+
+	-- Title bar: gradient strip, accent line under it, and a faint glow below the line.
+	local titleBar = GradientTexture(frame, "BACKGROUND", "VERTICAL", COLORS.titleBottom, nil, COLORS.titleTop, nil, 1)
+	titleBar:SetPoint("TOPLEFT")
+	titleBar:SetPoint("TOPRIGHT")
+	titleBar:SetHeight(TITLE_HEIGHT)
+
+	local accentLine = GradientTexture(frame, "ARTWORK", "HORIZONTAL", COLORS.accentA, 1, COLORS.accentB, 1)
+	accentLine:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT")
+	accentLine:SetPoint("TOPRIGHT", titleBar, "BOTTOMRIGHT")
+	PixelUtil.SetHeight(accentLine, 2, 1)
+
+	local accentGlow = GradientTexture(frame, "ARTWORK", "VERTICAL", COLORS.accentA, 0, COLORS.accentA, 0.18)
+	accentGlow:SetPoint("TOPLEFT", accentLine, "BOTTOMLEFT")
+	accentGlow:SetPoint("TOPRIGHT", accentLine, "BOTTOMRIGHT")
+	accentGlow:SetHeight(6)
+
+	local icon = frame:CreateTexture(nil, "ARTWORK")
+	icon:SetTexture(ns.icon)
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	icon:SetSize(20, 20)
+	icon:SetPoint("LEFT", titleBar, "LEFT", 10, 0)
+
+	frame.TitleText = frame:CreateFontString(nil, "OVERLAY")
+	SetFont(frame.TitleText, 16, COLORS.textSelected)
+	frame.TitleText:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+	frame.TitleText:SetText(ns.title:upper() .. "  |cff7f8799v" .. ns.version .. "|r")
+
+	frame.CloseButton = CreateCloseButton(frame)
+
+	-- ESC closes the window.
+	table.insert(UISpecialFrames, frame:GetName())
+
+	-- Unlock for all movable frames (Features/Layout.lua), in the title bar so it's there
+	-- on every page. Closing the window locks them again.
+	local unlockCheck = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+	unlockCheck:SetSize(22, 22)
+	SetFont(unlockCheck.Text, 12, COLORS.text)
+	unlockCheck.Text:SetText("Unlock frames")
+	unlockCheck:SetPoint("RIGHT", frame.CloseButton, "LEFT", -(unlockCheck.Text:GetStringWidth() + 12), 0)
+	unlockCheck:SetScript("OnClick", function(button)
+		if ns.SetUnlocked then
+			ns.SetUnlocked(button:GetChecked())
+		end
+	end)
+	frame.UnlockCheck = unlockCheck
+
+	-- The action bars are placed in Blizzard's Edit Mode; this opens it while unlocked.
+	local editModeButton = CreateAccentButton(frame, 110, 20)
+	editModeButton:SetPoint("RIGHT", unlockCheck, "LEFT", -10, 0)
+	editModeButton:SetText("Edit action bars")
+	editModeButton:SetScript("OnClick", function()
+		if ns.OpenEditMode then
+			ns.OpenEditMode()
+		end
+	end)
+	editModeButton:Hide()
+	frame.EditModeButton = editModeButton
+
+	-- Closing locks the frames, except when the window only steps aside for Edit Mode.
+	frame:HookScript("OnHide", function()
+		if ns.IsInEditModeFromUnlock and ns.IsInEditModeFromUnlock() then
+			return
+		end
+		if ns.SetUnlocked then
+			ns.SetUnlocked(false)
+		end
+	end)
+
+	-- Sidebar
+	local sidebar = SolidTexture(frame, "BACKGROUND", COLORS.sidebar, nil, 2)
+	sidebar:SetPoint("TOPLEFT", 0, -(TITLE_HEIGHT + 2))
+	sidebar:SetPoint("BOTTOMLEFT")
+	sidebar:SetWidth(SIDEBAR_WIDTH)
+
+	local divider = SolidTexture(frame, "BORDER", COLORS.border)
+	divider:SetPoint("TOPLEFT", sidebar, "TOPRIGHT")
+	divider:SetPoint("BOTTOMLEFT", sidebar, "BOTTOMRIGHT")
+	PixelUtil.SetWidth(divider, 1, 1)
+
+	-- The menu scrolls inside the sidebar when it is taller than the window.
+	navScroll = CreateFrame("ScrollFrame", nil, frame)
+	navScroll:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, -10)
+	navScroll:SetPoint("BOTTOMLEFT", sidebar, "BOTTOMLEFT", 0, 10)
+	navScroll:SetWidth(SIDEBAR_WIDTH)
+	navScroll:EnableMouseWheel(true)
+	navScroll:SetScript("OnMouseWheel", function(self, delta)
+		SetNavScroll(self:GetVerticalScroll() - delta * NAV_WHEEL_STEP)
+	end)
+	navScroll:SetScript("OnSizeChanged", function(self)
+		SetNavScroll(self:GetVerticalScroll())
+	end)
+
+	navChild = CreateFrame("Frame", nil, navScroll)
+	navChild:SetSize(SIDEBAR_WIDTH, 1)
+	navScroll:SetScrollChild(navChild)
+
+	navThumb = CreateNavThumb(navScroll)
+
+	-- Outline last, so it sits on top of the title bar and sidebar edges.
+	AddBorder(frame, frame, COLORS.border)
+
+	content = CreateFrame("Frame", nil, frame)
+	content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 12, -8)
+	content:SetPoint("BOTTOMRIGHT", -14, 12)
+
+	emptyText = content:CreateFontString(nil, "OVERLAY")
+	SetFont(emptyText, 14, COLORS.textDim)
+	emptyText:SetPoint("CENTER")
+	emptyText:SetText("No features yet.")
+
+	local count = BuildNav()
+	emptyText:SetShown(count == 0)
+	LayoutNav()
+
+	-- Sizes are only reliable once the window is on screen; recheck the scroll bar then.
+	frame:HookScript("OnShow", function()
+		SetNavScroll(navScroll:GetVerticalScroll())
+		ScrollToCurrent()
+	end)
+
+	RestorePosition()
+end
+
+function MainWindow:Init()
+	BuildFrame()
+end
+
+-- Called by Layout when frames are locked or unlocked.
+function MainWindow:SetUnlockChecked(checked)
+	if frame then
+		frame.UnlockCheck:SetChecked(checked)
+		frame.EditModeButton:SetShown(checked)
+	end
+end
+
+function MainWindow:ShowPage(name)
+	local module = ns:GetModule(name)
+	if not module or not module.CreatePage then
+		return
+	end
+
+	if currentPage and currentPage ~= name then
+		pages[currentPage]:Hide()
+	end
+
+	local page = pages[name]
+	if not page then
+		page = CreateFrame("Frame", nil, content)
+		page:SetAllPoints()
+		page:Hide()
+		module:CreatePage(page)
+		-- OnShow fires both when switching to this page and when the window is reopened on it.
+		if module.OnPageShown then
+			page:SetScript("OnShow", function(self)
+				module:OnPageShown(self)
+			end)
+		end
+		pages[name] = page
+	end
+
+	-- Opening a group (or one of its pages) folds whichever group was open before.
+	if navGroups[name] then
+		expandedGroup = name
+	elseif module.navParent and navGroups[module.navParent] then
+		expandedGroup = module.navParent
+	end
+
+	currentPage = name
+	ns.db.window.page = name
+	RefreshNav()
+
+	page:Show()
+	frame:Show()
+end
+
+local function FirstPageName()
+	for _, module in ipairs(ns:GetSortedModules()) do
+		if module.CreatePage then
+			return module.name
+		end
+	end
+end
+
+function MainWindow:Show()
+	if currentPage then
+		frame:Show()
+		return
+	end
+
+	local saved = ns.db.window.page
+	local savedModule = saved and ns:GetModule(saved)
+	local name = (savedModule and savedModule.CreatePage and saved) or FirstPageName()
+	if name then
+		self:ShowPage(name)
+	else
+		frame:Show()
+	end
+end
+
+function MainWindow:Hide()
+	frame:Hide()
+end
+
+function MainWindow:Toggle()
+	if frame:IsShown() then
+		self:Hide()
+	else
+		self:Show()
+	end
+end
+
+function MainWindow:ResetPosition()
+	ns.db.window.point = nil
+	RestorePosition()
+	frame:Show()
+end
