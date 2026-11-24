@@ -50,3 +50,8 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Tooling note: n8n won't delete an active workflow, so the MCP has to deactivate it first.
 - Write test (execution 27): creating the issue worked (#1), but GitHub quietly dropped the `Ideas` label, and the comment failed with 403 "Resource not accessible by personal access token". So the token lacks Issues write on Factory. On a public repo, anyone can open an issue, so the create step proved nothing. #1 was closed by hand with `gh`. (Report: the read test alone would have missed this, so it's worth testing writes explicitly.)
 - Adam fixed the token permissions. Rerun (issue #2): n8n created the issue with the `Ideas` label, posted a `factory:status` comment, swapped the label to `Done` and closed the issue. Checked on GitHub with `gh`. The temporary workflow was deleted. T0.4 is done.
+
+## 2026-11-24 – T0.5 AdamAddon subtree
+- Added with `git subtree add --prefix=projects/AdamAddon adamaddon main`, without `--squash`, so the addon's full history is kept in Factory (as the plan says). Remote name: `adamaddon`.
+- Imported AdamAddon `main` at `12d5364`. The branch `feature/spellpower-tooltip` on AdamAddon was not imported; only `main` counts.
+- Sync later with `git subtree pull --prefix=projects/AdamAddon adamaddon main`, and push changes back with `git subtree push`.
