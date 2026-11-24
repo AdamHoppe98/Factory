@@ -76,3 +76,13 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 
 ## 2026-11-24 – Commit and push rule
 - Adam: interactive Claude sessions may commit and push on their own judgment, `main` included. Why: this is an AI-focused project, and asking every time slows the work down. Factory agent runs still only push `issue-N` branches, and Adam still merges every PR. CLAUDE.md updated.
+
+## 2026-11-24 – T1.3 WF1 Refine
+- WF1 polls every minute and refines **one** issue per run: an `Ideas` issue, or a `Ready for approval` issue with a comment from Adam after the latest spec. The oldest issue goes first. Why: Ollama handles one request at a time anyway, and one issue per run keeps the execution log easy to read.
+- The label is set to `Refining` before the model runs. A run takes about a minute, and the next poll skips issues in `Refining`, so the same issue isn't refined twice.
+- If Ollama fails (after 1 retry), the issue goes back to its old label, and the next poll tries again. `Refining` never gets stuck because of an Ollama error.
+- Labels are set with `PUT /issues/N/labels`. It replaces all labels in one call, keeps non-state labels (such as `bug`) and swaps only the state label. The native GitHub node's label field can't build a list from an expression.
+- GitHub calls use HTTP Request with the `Github Factory` credential when the GitHub node has no matching operation (listing comments, reading a raw file). Posting the spec uses the native GitHub node.
+- The prompt and the template are read from `main` through the GitHub API on every run. A prompt change goes live when Adam merges it, with no re-import in n8n. (Answers the T1.2 question: Adam agreed.)
+- The author filter (only `AdamHoppe98` issues and comments) is already in WF1, because it costs one condition. T2.7 still covers the other workflows.
+- Adam activates WF1 in n8n. The auto-mode permission check blocked Claude from activating it, which matches the rule that putting a workflow live is Adam's QA step. Claude creates the workflow inactive in n8n, and the JSON goes in by PR.
