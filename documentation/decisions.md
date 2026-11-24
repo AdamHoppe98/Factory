@@ -55,3 +55,12 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Added with `git subtree add --prefix=projects/AdamAddon adamaddon main`, without `--squash`, so the addon's full history is kept in Factory (as the plan says). Remote name: `adamaddon`.
 - Imported AdamAddon `main` at `12d5364`. The branch `feature/spellpower-tooltip` on AdamAddon was not imported; only `main` counts.
 - Sync later with `git subtree pull --prefix=projects/AdamAddon adamaddon main`, and push changes back with `git subtree push`.
+
+## 2026-11-24 – T1.1 spec template and issue template
+- Spec sections: Target, Goal, Why, Scope (in/out), Constraints, Acceptance criteria, How to test, Open questions. They cover what the assignment asks for (what, why, constraints, checkable criteria) plus what the agent and Adam's QA need.
+- Short Markdown headings with `<placeholders>`, not JSON or YAML. Why: qwen3:8b follows a filled-in example more reliably than a schema, and the same text is easy for Adam to read on GitHub.
+- Acceptance criteria are checkboxes that must be yes/no checks. That gives the agent a clear definition of done and gives Adam a QA checklist on the PR.
+- "How to test" covers both the agent's tests and Adam's manual check. AdamAddon is a WoW addon and can't run outside the game, so most of its QA is manual.
+- "Open questions" lets the AI step ask Adam questions inside the spec comment (assignment step 2). "None" means the spec is ready.
+- "Only change files inside the Target" is a fixed constraint in every spec (D4).
+- The issue template auto-applies the `Ideas` label, so a new idea enters the factory without a manual label step. Its fields (What, Why, Target) are optional hints. The AI step fills the gaps.
