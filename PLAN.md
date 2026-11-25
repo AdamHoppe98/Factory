@@ -110,12 +110,12 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] **T1.4** Build WF2 Start task (Basic A version: sets `Building` and posts the manual command).
 - [x] **T1.5** Build WF3 Track PRs.
 - [x] **T1.6** Write `prompts/agent.md` and `scripts/run-manual.sh <issue>`, which creates the branch and starts Claude Code with the spec.
-- [~] **T1.7** Run 2–3 real tasks end to end, for example T2.1 built by the factory. Log each run in `evaluation-log.md`.
+- [x] **T1.7** Run 2–3 real tasks end to end, for example T2.1 built by the factory. Log each run in `evaluation-log.md`.
 - [~] **T1.8** GitHub Action `sync-adamaddon.yml`: after a merge to `main` that changes `projects/AdamAddon/**`, push the subtree to the AdamAddon repo. *Added 2026-11-25 by Adam's request.*
 
 ### Phase 2 – Basic B (automated factory)
 - [x] **T2.1** Runner skeleton: HTTP API, in-memory and JSON-file run state, one run at a time, tests.
-- [ ] **T2.2** Runner execution: git worktree, `claude -p` with an allowlist, 30-minute timeout, branch push.
+- [ ] **T2.2** Runner execution: git worktree, `claude -p` with an allowlist, 30-minute timeout, branch push. Also from the #12 review: store `title`/`spec`/`qa` on `POST /runs`, and return 400 when `issue` is missing.
 - [ ] **T2.3** Runner result parsing for the status contract, plus tests with fake agent output.
 - [ ] **T2.4** WF2 v2: call `POST /runs`.
 - [ ] **T2.5** WF4: collect results and open the PR, or post the question, or mark the task Stuck.
