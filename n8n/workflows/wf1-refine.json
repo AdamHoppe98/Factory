@@ -6,9 +6,19 @@
       "name": "Every minute",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "parameters": {
-        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
       }
     },
     {
@@ -16,36 +26,59 @@
       "name": "List open issues",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "parameters": {
         "url": "https://api.github.com/repos/AdamHoppe98/Factory/issues?state=open&per_page=100",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {}
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } }
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
     },
     {
       "id": "a1000000-0000-4000-8000-000000000003",
       "name": "Adam's ideas and specs",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
           "conditions": [
             {
               "id": "c1",
               "leftValue": "={{ $json.user?.login }}",
               "rightValue": "AdamHoppe98",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             },
             {
               "id": "c2",
               "leftValue": "={{ !$json.pull_request && $json.labels.some(l => l.name === 'Ideas' || l.name === 'Ready for approval') }}",
               "rightValue": "",
-              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -58,14 +91,28 @@
       "name": "Get comments",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "parameters": {
         "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $json.number }}/comments?per_page=100",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
-        "options": { "response": { "response": { "fullResponse": true } } }
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
       "notes": "Full response keeps one output item per issue, so item i lines up with issue i."
     },
     {
@@ -73,46 +120,150 @@
       "name": "Pick issue",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0],
+      "position": [
+        880,
+        0
+      ],
       "parameters": {
-        "jsCode": "// Picks one issue to refine: an Ideas issue, or a Ready for approval issue\n// with a comment from Adam after the latest spec. Builds the prompt input.\nconst ADAM = 'AdamHoppe98';\nconst SPEC = '<!-- factory:spec -->';\nconst STATES = ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building',\n  'Waiting for you', 'Stuck', 'Your QA', 'Done'];\n\nconst issues = $(\"Adam's ideas and specs\").all();\nconst replies = $input.all();\nconst candidates = [];\n\nissues.forEach((item, i) => {\n  const issue = item.json;\n  const comments = replies[i]?.json.body ?? [];\n  const labels = issue.labels.map(l => l.name);\n  const from = labels.includes('Ideas') ? 'Ideas' : 'Ready for approval';\n\n  let lastSpec = -1;\n  comments.forEach((c, j) => { if ((c.body ?? '').trimStart().startsWith(SPEC)) lastSpec = j; });\n  const human = comments.slice(lastSpec + 1).filter(c =>\n    c.user?.login === ADAM && !(c.body ?? '').trimStart().startsWith('<!-- factory:'));\n\n  if (from === 'Ready for approval' && human.length === 0) return;\n  candidates.push({ issue, labels, from, human,\n    previousSpec: lastSpec >= 0 ? comments[lastSpec].body : null });\n});\n\nif (candidates.length === 0) return [];\ncandidates.sort((a, b) => a.issue.number - b.issue.number);\nconst c = candidates[0];\n\nconst commentsText = c.human.length\n  ? c.human.map(h => `[${h.created_at}]\\n${h.body}`).join('\\n\\n')\n  : 'None';\nconst userMessage = `ISSUE #${c.issue.number}: ${c.issue.title}\\n${c.issue.body ?? ''}\\n\\n`\n  + `PREVIOUS SPEC:\\n${c.previousSpec ?? 'None'}\\n\\nCOMMENTS:\\n${commentsText}`;\n\nreturn [{ json: {\n  number: c.issue.number,\n  from: c.from,\n  otherLabels: c.labels.filter(n => !STATES.includes(n)),\n  userMessage,\n} }];"
+        "jsCode": "// Picks one issue to refine: an Ideas issue, or a Ready for approval issue\n// with a comment from Adam after the latest spec. Builds the prompt input.\nconst ADAM = 'AdamHoppe98';\nconst SPEC = '<!-- factory:spec -->';\n\nconst issues = $(\"Adam's ideas and specs\").all();\nconst replies = $input.all();\nconst candidates = [];\n\nissues.forEach((item, i) => {\n  const issue = item.json;\n  const comments = replies[i]?.json.body ?? [];\n  const labels = issue.labels.map(l => l.name);\n  const from = labels.includes('Ideas') ? 'Ideas' : 'Ready for approval';\n\n  let lastSpec = -1;\n  comments.forEach((c, j) => { if ((c.body ?? '').trimStart().startsWith(SPEC)) lastSpec = j; });\n  const human = comments.slice(lastSpec + 1).filter(c =>\n    c.user?.login === ADAM && !(c.body ?? '').trimStart().startsWith('<!-- factory:'));\n\n  if (from === 'Ready for approval' && human.length === 0) return;\n  candidates.push({ issue, labels, from, human,\n    previousSpec: lastSpec >= 0 ? comments[lastSpec].body : null });\n});\n\nif (candidates.length === 0) return [];\ncandidates.sort((a, b) => a.issue.number - b.issue.number);\nconst c = candidates[0];\n\nconst commentsText = c.human.length\n  ? c.human.map(h => `[${h.created_at}]\\n${h.body}`).join('\\n\\n')\n  : 'None';\nconst userMessage = `ISSUE #${c.issue.number}: ${c.issue.title}\\n${c.issue.body ?? ''}\\n\\n`\n  + `PREVIOUS SPEC:\\n${c.previousSpec ?? 'None'}\\n\\nCOMMENTS:\\n${commentsText}`;\n\nreturn [{ json: {\n  number: c.issue.number,\n  from: c.from,\n  userMessage,\n} }];"
       },
       "notes": "Why Code: pairs each issue with its comments, finds the latest spec and Adam's newer comments, and builds the prompt input. Replaces many glue nodes."
     },
     {
-      "id": "a1000000-0000-4000-8000-000000000006",
-      "name": "Set Refining",
+      "id": "a1000000-0000-4000-8000-00000000011",
+      "name": "Remove Ideas or Ready",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 0],
+      "position": [
+        1100,
+        0
+      ],
       "parameters": {
-        "method": "PUT",
-        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $json.number }}/labels",
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick issue').first().json.number }}/labels/{{ encodeURIComponent($('Pick issue').first().json.from) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Move the state label: delete the old one first. 404 = Adam changed it, so skip this issue."
+    },
+    {
+      "id": "a1000000-0000-4000-8000-00000000012",
+      "name": "Still Ideas or Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.statusCode === 200 && !$json.body.some(l => ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building', 'Waiting for you', 'Stuck', 'Your QA', 'Done'].includes(l.name)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "200 = the old state label was there. If Adam set another state meanwhile, his label wins."
+    },
+    {
+      "id": "a1000000-0000-4000-8000-00000000013",
+      "name": "Add Refining",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick issue').first().json.number }}/labels",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ labels: [...$json.otherLabels, 'Refining'] }) }}",
-        "options": { "response": { "response": { "fullResponse": true } } }
+        "jsonBody": "={{ JSON.stringify({ labels: ['Refining'] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } },
-      "notes": "PUT replaces all labels: the non-state labels are kept, the state becomes Refining."
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
     },
     {
       "id": "a1000000-0000-4000-8000-000000000007",
       "name": "Get prompt",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 0],
+      "position": [
+        1760,
+        0
+      ],
       "parameters": {
         "url": "https://api.github.com/repos/AdamHoppe98/Factory/contents/prompts/refine.md?ref=main",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Accept", "value": "application/vnd.github.raw" }] },
-        "options": { "response": { "response": { "responseFormat": "text", "outputPropertyName": "prompt" } } }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.raw"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "prompt"
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
       "notes": "Read from main, so a prompt change goes live when Adam merges it."
     },
     {
@@ -120,23 +271,48 @@
       "name": "Get template",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 0],
+      "position": [
+        1980,
+        0
+      ],
       "parameters": {
         "url": "https://api.github.com/repos/AdamHoppe98/Factory/contents/templates/spec-template.md?ref=main",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Accept", "value": "application/vnd.github.raw" }] },
-        "options": { "response": { "response": { "responseFormat": "text", "outputPropertyName": "template" } } }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.raw"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "template"
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } }
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
     },
     {
       "id": "a1000000-0000-4000-8000-000000000009",
       "name": "Refine with qwen3",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, 0],
+      "position": [
+        2200,
+        0
+      ],
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 5000,
@@ -147,7 +323,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'qwen3:8b', stream: false, think: true, options: { temperature: 0.2 }, messages: [ { role: 'system', content: $('Get prompt').first().json.prompt.replace(/\\{\\{SPEC_TEMPLATE\\}\\}/, () => $json.template.trim()) }, { role: 'user', content: $('Pick issue').first().json.userMessage } ] }) }}",
-        "options": { "timeout": 600000 }
+        "options": {
+          "timeout": 600000
+        }
       },
       "notes": "think: true follows the prompt rules better (T1.2). The regex fills {{SPEC_TEMPLATE}}."
     },
@@ -156,72 +334,299 @@
       "name": "Post spec",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
-      "position": [1980, -100],
+      "position": [
+        2420,
+        -120
+      ],
       "parameters": {
         "resource": "issue",
         "operation": "createComment",
-        "owner": { "__rl": true, "mode": "name", "value": "AdamHoppe98" },
-        "repository": { "__rl": true, "mode": "name", "value": "Factory" },
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "AdamHoppe98"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Factory"
+        },
         "issueNumber": "={{ $('Pick issue').first().json.number }}",
         "body": "={{ (s => s.startsWith('<!-- factory:spec -->') ? s : '<!-- factory:spec -->\\n' + s)($json.message.content.trim()) }}"
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
       "notes": "Adds the spec marker if the model left it out."
     },
     {
-      "id": "a1000000-0000-4000-8000-00000000000b",
-      "name": "Set Ready for approval",
+      "id": "a1000000-0000-4000-8000-00000000021",
+      "name": "Remove Refining",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, -100],
+      "position": [
+        2640,
+        0
+      ],
       "parameters": {
-        "method": "PUT",
-        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick issue').first().json.number }}/labels",
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick issue').first().json.number }}/labels/{{ encodeURIComponent('Refining') }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ labels: [...$('Pick issue').first().json.otherLabels, 'Ready for approval'] }) }}",
-        "options": { "response": { "response": { "fullResponse": true } } }
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } }
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Both qwen3 outputs end here. Success: Ready for approval. Ollama failed: back to the old state, so the next poll retries."
     },
     {
-      "id": "a1000000-0000-4000-8000-00000000000c",
-      "name": "Undo Refining",
+      "id": "a1000000-0000-4000-8000-00000000022",
+      "name": "Still Refining?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.statusCode === 200 && !$json.body.some(l => ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building', 'Waiting for you', 'Stuck', 'Your QA', 'Done'].includes(l.name)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "200 = the old state label was there. If Adam set another state meanwhile, his label wins."
+    },
+    {
+      "id": "a1000000-0000-4000-8000-00000000023",
+      "name": "Add Ready for approval or back",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1980, 100],
+      "position": [
+        3080,
+        0
+      ],
       "parameters": {
-        "method": "PUT",
+        "method": "POST",
         "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick issue').first().json.number }}/labels",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ labels: [...$('Pick issue').first().json.otherLabels, $('Pick issue').first().json.from] }) }}",
-        "options": { "response": { "response": { "fullResponse": true } } }
+        "jsonBody": "={{ JSON.stringify({ labels: [$('Post spec').isExecuted ? 'Ready for approval' : $('Pick issue').first().json.from] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
-      "credentials": { "githubApi": { "id": "CcLRRNf9ryjsAy1J", "name": "Github Factory" } },
-      "notes": "Ollama failed: put the issue back in its old state, so the next poll retries it."
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
     }
   ],
   "connections": {
-    "Every minute": { "main": [[{ "node": "List open issues", "type": "main", "index": 0 }]] },
-    "List open issues": { "main": [[{ "node": "Adam's ideas and specs", "type": "main", "index": 0 }]] },
-    "Adam's ideas and specs": { "main": [[{ "node": "Get comments", "type": "main", "index": 0 }]] },
-    "Get comments": { "main": [[{ "node": "Pick issue", "type": "main", "index": 0 }]] },
-    "Pick issue": { "main": [[{ "node": "Set Refining", "type": "main", "index": 0 }]] },
-    "Set Refining": { "main": [[{ "node": "Get prompt", "type": "main", "index": 0 }]] },
-    "Get prompt": { "main": [[{ "node": "Get template", "type": "main", "index": 0 }]] },
-    "Get template": { "main": [[{ "node": "Refine with qwen3", "type": "main", "index": 0 }]] },
-    "Refine with qwen3": {
+    "Every minute": {
       "main": [
-        [{ "node": "Post spec", "type": "main", "index": 0 }],
-        [{ "node": "Undo Refining", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "List open issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Post spec": { "main": [[{ "node": "Set Ready for approval", "type": "main", "index": 0 }]] }
+    "List open issues": {
+      "main": [
+        [
+          {
+            "node": "Adam's ideas and specs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adam's ideas and specs": {
+      "main": [
+        [
+          {
+            "node": "Get comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get comments": {
+      "main": [
+        [
+          {
+            "node": "Pick issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick issue": {
+      "main": [
+        [
+          {
+            "node": "Remove Ideas or Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Ideas or Ready": {
+      "main": [
+        [
+          {
+            "node": "Still Ideas or Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Ideas or Ready?": {
+      "main": [
+        [
+          {
+            "node": "Add Refining",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Add Refining": {
+      "main": [
+        [
+          {
+            "node": "Get prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get prompt": {
+      "main": [
+        [
+          {
+            "node": "Get template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get template": {
+      "main": [
+        [
+          {
+            "node": "Refine with qwen3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine with qwen3": {
+      "main": [
+        [
+          {
+            "node": "Post spec",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Remove Refining",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post spec": {
+      "main": [
+        [
+          {
+            "node": "Remove Refining",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Refining": {
+      "main": [
+        [
+          {
+            "node": "Still Refining?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Refining?": {
+      "main": [
+        [
+          {
+            "node": "Add Ready for approval or back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
