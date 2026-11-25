@@ -1,7 +1,7 @@
 # CLAUDE.md – Factory
 
 Exam project: a small software factory. GitHub issues are the specs, n8n orchestrates, a Python runner starts Claude Code, and Adam reviews every PR.
-Full assignment: `Exam.project.description.md`. Plan and task status: `PLAN.md`.
+Full assignment: `Exam.project.description-version.2.md` (version 2 has the detailed Advanced part). Plan and task status: `PLAN.md`.
 
 ## How we work (important)
 - **Don't build everything in one go.** Follow `PLAN.md`: one task at a time, in order, and only after the plan is approved.

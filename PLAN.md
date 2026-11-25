@@ -2,7 +2,7 @@
 
 Status: **APPROVED 2026-11-19.** Implement one task at a time.
 
-Source documents: [Exam.project.description.md](Exam.project.description.md), [alreadySetup.md](alreadySetup.md).
+Source documents: [Exam.project.description-version.2.md](Exam.project.description-version.2.md) (current; v1: [Exam.project.description.md](Exam.project.description.md)), [alreadySetup.md](alreadySetup.md).
 Questions, answers and decisions: [documentation/decisions.md](documentation/decisions.md).
 
 ## 1. Goal
@@ -123,16 +123,17 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [ ] **T2.7** Author filter: only Adam's issues and comments are processed.
 - [ ] **T2.8** Run real tasks through the automated factory, both factory tasks and AdamAddon tasks. Log them.
 
-### Phase 3 – Advanced (scope to be decided after Basic B)
-Candidates. Pick together later.
-- Safety:
-  - Path fence: the runner rejects diffs outside `Target`.
-  - Branch protection on `main`.
-  - Check that the `Approved` label was set by Adam (issue events API).
-  - Tighter tool allowlist.
-  - Runner and agent in a Docker container.
-- Memory of past tasks in Neo4j, exposed through an MCP server to the agent and the refine step.
-- Compare the AI step on Claude API and on qwen3:8b.
+### Phase 3 – Advanced (assignment version 2)
+Required, in this order, after Basic B:
+- [ ] **T3.1** Runner checks the agent's work: is there a code change, and do the tests pass when the runner runs them? If not → `Stuck`. The real test result goes into the PR. A PR that changes existing tests or `.github/` gets the label `Flagged` and a warning. Open point: AdamAddon has no tests (syntax check such as `luac -p` in the container?).
+- [ ] **T3.2** Safe agent: the agent runs in its own container on a closed Docker network that reaches only the model. Only the runner holds the GitHub token and pushes. (The runner's configurable agent command from T2.2 is where this plugs in.)
+
+Extensions: Adam picks after Basic B.
+- Memory in Neo4j (n8n reads and writes it; vector search and graph; the refine step uses it).
+- MCP tool `search_past_tasks` for the agent (n8n MCP Server Trigger, with authentication).
+- AI review of each PR against the acceptance criteria (a different model if possible; advisory only).
+- Review comments back to the agent (sent back from `Your QA`, the agent continues on the same branch).
+- Metrics: done on the first run, questions, stuck, time per task.
 
 ### Phase 4 – Evaluation and report
 - [ ] **T4.1** Run several AdamAddon tasks.
@@ -140,4 +141,4 @@ Candidates. Pick together later.
 - [ ] **T4.3** Write the report (max 5 pages) in `documentation/report/`.
 
 ## 8. Open points
-- The Phase 3 scope gets decided after Basic B works.
+- The Phase 3 extensions get picked after Basic B works. T3.1 and T3.2 are required.
