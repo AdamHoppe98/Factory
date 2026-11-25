@@ -1,0 +1,540 @@
+{
+  "name": "WF4 Collect results",
+  "nodes": [
+    {
+      "id": "a5000000-0000-4000-8000-000000000001",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000002",
+      "name": "List Building issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/AdamHoppe98/Factory/issues?state=open&labels=Building&per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000003",
+      "name": "Get comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $json.number }}/comments?per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000004",
+      "name": "Find run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Takes the run id from the latest status comment with a <!-- run: ID --> marker.\n// Building issues without one (Basic A manual runs) are skipped.\nconst issues = $('List Building issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const ids = (item.json.body ?? [])\n    .map(c => /<!-- run: ([\\w-]+) -->/.exec(c.body ?? ''))\n    .filter(Boolean).map(m => m[1]);\n  if (!issue.number || ids.length === 0) return [];\n  return [{ json: { number: issue.number, title: issue.title, runId: ids[ids.length - 1] }, pairedItem: { item: i } }];\n});"
+      },
+      "notes": "Why Code: finds the run id marker in the latest WF2 v2 status comment of each Building issue."
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000005",
+      "name": "Get run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://host.docker.internal:8787/runs/{{ $json.runId }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Runner down or unknown run: no state matches, so nothing happens and the next poll tries again."
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000006",
+      "name": "Run state",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body?.state }}",
+                    "rightValue": "done",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "done"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body?.state }}",
+                    "rightValue": "question",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "question"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body?.state }}",
+                    "rightValue": "stuck",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stuck"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "running (or anything else) matches no output: nothing happens."
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000007",
+      "name": "Open PR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/AdamHoppe98/Factory/pulls",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Find run').item.json.title, head: 'issue-' + $('Find run').item.json.number, base: 'main', body: 'Closes #' + $('Find run').item.json.number + '\\n\\n**Summary (agent):** ' + $('Get run').item.json.body.summary + '\\n\\n**Tests (agent):** ' + $('Get run').item.json.body.tests + '\\n\\nBuilt by the factory (Basic B), run `' + $('Find run').item.json.runId + '`.' }) }}"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "422 = a PR from issue-N already exists (a rerun after QA). That's fine, the issue still goes to Your QA."
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000008",
+      "name": "Post question",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "AdamHoppe98"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Factory"
+        },
+        "issueNumber": "={{ $('Find run').item.json.number }}",
+        "body": "=<!-- factory:question -->\n{{ $('Get run').item.json.body.question }}\n\n_Answer in a comment. Then the task goes back to `Approved` and the agent continues on `issue-{{ $('Find run').item.json.number }}`._"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000009",
+      "name": "Post stuck",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        160
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "mode": "name",
+          "value": "AdamHoppe98"
+        },
+        "repository": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Factory"
+        },
+        "issueNumber": "={{ $('Find run').item.json.number }}",
+        "body": "=<!-- factory:status -->\n**Stuck.** {{ $('Get run').item.json.body.summary }}\n\nEnd of the agent log (run `{{ $('Find run').item.json.runId }}`):\n```\n{{ $('Get run').item.json.body.log_tail }}\n```\nSet `Approved` to retry, or close the issue."
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000010",
+      "name": "Remove Building",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Find run').item.json.number }}/labels/Building",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Guarded move, same as the other workflows. 404 = Adam changed the state meanwhile."
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000011",
+      "name": "Still Building?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.statusCode === 200 && !$json.body.some(l => ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building', 'Waiting for you', 'Stuck', 'Your QA', 'Done'].includes(l.name)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a5000000-0000-4000-8000-000000000012",
+      "name": "Add result state",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Find run').item.json.number }}/labels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: [{ done: 'Your QA', question: 'Waiting for you', stuck: 'Stuck' }[$('Get run').item.json.body.state]] }) }}"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "List Building issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Building issues": {
+      "main": [
+        [
+          {
+            "node": "Get comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get comments": {
+      "main": [
+        [
+          {
+            "node": "Find run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find run": {
+      "main": [
+        [
+          {
+            "node": "Get run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get run": {
+      "main": [
+        [
+          {
+            "node": "Run state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run state": {
+      "main": [
+        [
+          {
+            "node": "Open PR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post question",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post stuck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open PR": {
+      "main": [
+        [
+          {
+            "node": "Remove Building",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post question": {
+      "main": [
+        [
+          {
+            "node": "Remove Building",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post stuck": {
+      "main": [
+        [
+          {
+            "node": "Remove Building",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Building": {
+      "main": [
+        [
+          {
+            "node": "Still Building?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Building?": {
+      "main": [
+        [
+          {
+            "node": "Add result state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
