@@ -12,7 +12,7 @@ Issue #{{ISSUE}}: {{TITLE}}
 
 ## Rules
 
-1. You are on branch `issue-{{ISSUE}}` in a git worktree. Stay on it. Don't push, merge or switch branches. The factory pushes the branch and opens the PR.
+1. You are on branch `issue-{{ISSUE}}` in a git worktree. Stay on it. Don't push, merge or switch branches. The factory pushes the branch and opens the PR **after** your run ends, so while you work there is no PR. Never say a PR exists or is ready.
 2. Change only files inside the spec's `Target` (`factory` = repo root, outside `projects/`; `projects/AdamAddon` = only that folder). Follow `CLAUDE.md` and, for AdamAddon, `projects/AdamAddon/.claude/CLAUDE.md`.
 3. Build what the spec asks for, and nothing more. Meet every acceptance criterion.
 4. If something is unclear and it changes what you build, don't guess. Stop and ask with status `question`. Small details you can decide yourself.

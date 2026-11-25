@@ -48,6 +48,9 @@ print(text)
 EOF
 )"
 
+# Manual run only: the push and PR happen in this script after Claude Code exits.
+PROMPT="$PROMPT"$'\n\n'"This is a manual run. Adam watches the chat. Right before the JSON block, tell him: \"Type /exit. The script then pushes issue-$N and opens the PR.\""
+
 mkdir -p "$(dirname "$PROMPT_FILE")"
 printf '%s\n' "$PROMPT" > "$PROMPT_FILE"
 
