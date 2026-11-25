@@ -11,13 +11,13 @@ The Action needs a token that can write to AdamAddon. The Factory token can't.
 3. **Repository access:** Only select repositories → `AdamHoppe98/AdamAddon`.
 4. **Permissions → Repository permissions → Contents: Read and write.** Nothing else.
 5. Generate and copy the token.
-6. Save it as an Actions secret in Factory. In Claude Code, type:
+6. Save it as an Actions secret in Factory. Use a **separate terminal window**, not the Claude Code chat:
 
    ```
-   ! gh secret set ADAMADDON_TOKEN --repo AdamHoppe98/Factory
+   gh secret set ADAMADDON_TOKEN --repo AdamHoppe98/Factory
    ```
 
-   and paste the token when asked. It doesn't show up in the chat or in git.
+   The command takes the secret's *name*. Paste the token only at the `? Paste your secret:` prompt. Never put the token in the command line or in the chat: it then ends up in the shell history and in the transcript, and has to be regenerated.
 
 Check: Factory → **Actions → Sync AdamAddon → Run workflow**. With nothing new to push, it ends green.
 
