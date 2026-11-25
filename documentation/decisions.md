@@ -141,3 +141,9 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - PLAN Phase 3 updated: T3.1 runner checks and T3.2 container are required tasks. Adam picks the extensions after Basic B, as before.
 - No change to the T2.2 issue that is about to be built. Its "no push for the agent" and "configurable agent command" already fit T3.2.
 - Open point for T3.1: AdamAddon has no tests and the Mac has no Lua interpreter. The runner needs some check for addon tasks, for example `luac -p` in the container.
+
+## 2026-11-25 – T2.2 runner execution (#15)
+- `POST /runs` returns 400 without a positive numeric `issue`, stores `title`/`spec`/`qa`, then runs the agent in a background thread (202 at once). Run states: `running` → `done` (exit 0 and push ok) or `stuck` (non-zero exit, timeout, worktree or push failure). T2.3 will add `question` parsing.
+- Worktree `runner/worktrees/issue-N`: reused if present, else created from local `issue-N`, `origin/issue-N` or `origin/main` (in that order). Prompt comes from `prompts/agent.md`; empty Q&A becomes `None`; the prompt goes to the agent on stdin.
+- Agent command: `claude -p --model sonnet --allowedTools ...`, replaced by `TEST_AGENT_CMD` when set (also the hook for T3.2). Timeout `TEST_TIMEOUT`, default 1800 s; on timeout the whole process group is killed. Allowlist: Read/Edit/Write/Glob/Grep and local git (status, diff, log, add, commit, show), ls, mkdir, python. No push, no curl/WebFetch.
+- Only the runner pushes (`git push origin issue-N` after exit 0). Log: `runner/logs/issue-N-<run_id>.log`; `log_tail` is its last 30 lines.
