@@ -22,7 +22,7 @@ These rules are for interactive sessions with Adam. **Factory agent runs** (`pro
 
 ## Conventions
 - State labels (exactly one per issue): `Ideas`, `Refining`, `Ready for approval`, `Approved`, `Building`, `Waiting for you`, `Stuck`, `Your QA`, `Done`.
-- Only Adam sets `Approved`. n8n sets the other states, except `Ideas`.
+- Only Adam sets `Approved`, with one exception: n8n (WF1b) moves `Waiting for you` → `Approved` when Adam answers the agent's question. n8n sets the other states, except `Ideas`.
 - Branch is `issue-N`, and the PR body contains `Closes #N`.
 - Bot comments start with a hidden marker: `<!-- factory:spec -->`, `<!-- factory:question -->` or `<!-- factory:status -->`. A comment without a marker is a human comment.
 - The latest `factory:spec` comment is the current spec.

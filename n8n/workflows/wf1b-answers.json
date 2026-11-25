@@ -1,0 +1,263 @@
+{
+  "name": "WF1b Answer to Approved",
+  "nodes": [
+    {
+      "id": "a6000000-0000-4000-8000-000000000001",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000002",
+      "name": "List waiting issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/AdamHoppe98/Factory/issues?state=open&labels=Waiting%20for%20you&per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000003",
+      "name": "Get comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $json.number }}/comments?per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000004",
+      "name": "Answered?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// An issue is answered when Adam wrote a plain comment after the agent's\n// latest factory:question comment.\nconst issues = $('List waiting issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const comments = item.json.body ?? [];\n  let q = -1;\n  comments.forEach((c, j) => { if ((c.body ?? '').trimStart().startsWith('<!-- factory:question -->')) q = j; });\n  const answered = comments.slice(q + 1).some(c =>\n    c.user?.login === 'AdamHoppe98' && !(c.body ?? '').trimStart().startsWith('<!-- factory:'));\n  if (!issue.number || issue.user?.login !== 'AdamHoppe98' || q < 0 || !answered) return [];\n  return [{ json: { number: issue.number }, pairedItem: { item: i } }];\n});"
+      },
+      "notes": "Why Code: finds the latest agent question among the comments and checks for Adam's answer after it."
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000005",
+      "name": "Remove Waiting for you",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Answered?').item.json.number }}/labels/Waiting%20for%20you",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Guarded move. 404 = Adam changed the state himself."
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000006",
+      "name": "Still waiting?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.statusCode === 200 && !$json.body.some(l => ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building', 'Waiting for you', 'Stuck', 'Your QA', 'Done'].includes(l.name)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a6000000-0000-4000-8000-000000000007",
+      "name": "Add Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Answered?').item.json.number }}/labels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: ['Approved'] }) }}"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Assignment (Basic B): Adam's answer sends the task back to Approved. WF2 v2 then starts a new run with the question and the answer as Q&A."
+    }
+  ],
+  "connections": {
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "List waiting issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List waiting issues": {
+      "main": [
+        [
+          {
+            "node": "Get comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get comments": {
+      "main": [
+        [
+          {
+            "node": "Answered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answered?": {
+      "main": [
+        [
+          {
+            "node": "Remove Waiting for you",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Waiting for you": {
+      "main": [
+        [
+          {
+            "node": "Still waiting?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still waiting?": {
+      "main": [
+        [
+          {
+            "node": "Add Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
