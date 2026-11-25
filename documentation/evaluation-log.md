@@ -24,3 +24,23 @@ One entry per task that goes through the factory. This is the raw material for t
 - **Review (Claude, for Adam):** 5/5 tests pass. Live API test passed: 202/409, run state, restart. n8n reaches the runner from Docker via `host.docker.internal`, even though it listens on 127.0.0.1. Minor gaps moved to T2.2: `POST /runs` doesn't store `title`/`spec`/`qa`, and it accepts a missing `issue`.
 - **Adam stepped in:** approval, run started by hand, merge. The script fix from #11 worked: the PR was opened by the script.
 - **Factory problem found:** two branches that both append to `decisions.md` conflict. A shared append-only log invites merge conflicts with agent branches.
+
+| Date | Issue | Target | Basic A/B | Result | Questions asked | Where Adam stepped in | Notes |
+|---|---|---|---|---|---|---|---|
+| 2026-11-25 | #15 Runner execution (T2.2) | factory | A | Merged (PR #16) | 0 | Approved, started the run by hand, merged. Merge conflicts on `decisions.md` (3 times) fixed by Claude. | Good code. Review found that the allowlist is not a security boundary. |
+| 2026-11-25 | #17 Result parsing (T2.3) | factory | A | Merged (PR #18) | 0 | Approved, started the run by hand, merged. | First run under the new rules: clean PR, decisions in the commit body. |
+| 2026-11-25 | #20 Runner README | factory | **B** | PR #22 in Your QA | 0 | Approved only. The build, push and PR were automatic. | First fully automatic run. Delayed by n8n running old workflow versions. |
+
+### #15 – Runner execution (T2.2)
+- **Agent:** background thread, worktree reuse, process-group kill on timeout, a run never stays `running`, only the runner pushes. 11 unit tests with a fake agent.
+- **Review (Claude):** 11/11 tests pass. A real `claude -p` smoke run against a sandbox clone (local bare repo as `origin`) was `done` in 15 s. `curl` was blocked by the allowlist, but `Bash(python3:*)` could still run any code, so the allowlist is only a guardrail (fixed in T2.3, the real boundary is T3.2).
+- **Problem:** the PR conflicted with `main` three times, because the agent and Claude both appended to `decisions.md`/`PLAN.md`. This led to the rule that agents don't edit shared docs.
+
+### #17 – Result parsing (T2.3)
+- **Agent:** parses the last ```json block, and anything unclear becomes `stuck` without a push. Allowlist narrowed, env vars renamed. 18 tests.
+- **New rules worked on the first try:** the PR touched only `runner/`, its decisions were in the commit body, and it merged cleanly.
+
+### #20 – Runner README (first Basic B run)
+- **Timeline:** Approved → WF2 v2 started run `ea86a86485ae` at 13:06 → `claude -p` wrote and committed the README (about a minute) → the runner parsed `done` and pushed → WF4 (activated later) opened PR #22 → `Your QA` at 13:16.
+- **Factory problem found:** n8n had been running old versions of WF1 and WF2 since the day before (draft vs. published, swapped on import). The old WF2 posted the manual command twice before the cause was found with the MCP. The T1.4 race fix had never been live. Fixed by creating fresh workflows from the repo JSON.
+- **Takeaway:** the automatic path works end to end. The weak spot was keeping n8n in sync with the repo, not the agent.
