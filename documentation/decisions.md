@@ -180,3 +180,4 @@ Review (Claude): 18/18 tests pass, including all the fake-output cases from the 
 - `stuck` → a status comment with the summary and the end of the log → `Stuck`.
 - `running`, the runner down, or an unknown run: nothing happens, and the next poll checks again. All three results share one guarded label move.
 - WF3 can also move `Building` → `Your QA` when the PR appears. The guarded move makes the two safe together: whichever comes second gets a 404 and does nothing.
+- T2.5 test: after Adam activated WF4, #20 (run `ea86a86485ae`, already `done`) got PR #22, opened by WF4 with the agent's summary, tests and run id, and moved to `Your QA` within a minute. The published WF4 matches the repo JSON (12 nodes, same connections). Idea → spec → approval → automatic build → PR, with no manual build step: the core of Basic B works.
