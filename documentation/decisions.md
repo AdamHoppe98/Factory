@@ -154,3 +154,13 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Worktree `runner/worktrees/issue-N`: reused if present, else created from local `issue-N`, `origin/issue-N` or `origin/main` (in that order). Prompt comes from `prompts/agent.md`; empty Q&A becomes `None`; the prompt goes to the agent on stdin.
 - Agent command: `claude -p --model sonnet --allowedTools ...`, replaced by `TEST_AGENT_CMD` when set (also the hook for T3.2). Timeout `TEST_TIMEOUT`, default 1800 s; on timeout the whole process group is killed. Allowlist: Read/Edit/Write/Glob/Grep and local git (status, diff, log, add, commit, show), ls, mkdir, python. No push, no curl/WebFetch.
 - Only the runner pushes (`git push origin issue-N` after exit 0). Log: `runner/logs/issue-N-<run_id>.log`; `log_tail` is its last 30 lines.
+
+## 2026-11-25 – T2.3 result parsing (#17, PR #18)
+Copied from the agent's commit body (the new rule worked: the PR touched only `runner/`):
+- Parse only on exit code 0. A non-zero exit or a timeout stays `stuck`, because the log may be incomplete.
+- `done` and `question` push `issue-N` (the work so far is needed for review or for the next run). `stuck` doesn't push.
+- A missing block, invalid JSON, non-object JSON or an unknown status gives `stuck`, with the reason as summary. Safe default: never push on an unclear result.
+- The last ```json block counts. Text after it is ignored.
+- Allowlist: `Bash(python3:*)` and `Bash(python:*)` replaced by `Bash(python3 -m unittest:*)`. pytest was left out (not used in this repo). Still a guardrail only: tests the agent writes can run any code. T3.2 is the boundary.
+- `TEST_AGENT_CMD`/`TEST_TIMEOUT` renamed to `RUNNER_AGENT_CMD`/`RUNNER_TIMEOUT`, with no fallback.
+Review (Claude): 18/18 tests pass, including all the fake-output cases from the issue. PR #18 merges cleanly with `main`, and #14 and #16 did not.
