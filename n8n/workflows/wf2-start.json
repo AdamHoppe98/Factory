@@ -1,5 +1,5 @@
 {
-  "name": "WF2 Start task",
+  "name": "WF2 Start task v2",
   "nodes": [
     {
       "id": "a2000000-0000-4000-8000-000000000001",
@@ -58,8 +58,8 @@
       "notes": "Why Code: the rule needs all issues at once (nothing Building, then the oldest Approved). One short node instead of Filter + Aggregate + IF + Sort + Limit."
     },
     {
-      "id": "a2000000-0000-4000-8000-000000000011",
-      "name": "Remove Approved",
+      "id": "a4000000-0000-4000-8000-000000000001",
+      "name": "Runner up?",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -67,8 +67,70 @@
         0
       ],
       "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:8787/health",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Runner not reachable: the error output is unconnected, so nothing changes and the next poll tries again."
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000002",
+      "name": "Get comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick approved issue').first().json.number }}/comments?per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000003",
+      "name": "Build run request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Builds the POST /runs body: the latest spec (without its marker line) and the\n// Q&A after it (the agent's questions and Adam's plain comments). Same rules as\n// scripts/run-manual.sh. No spec: start nothing.\nconst issue = $('Pick approved issue').first().json;\nconst comments = $json.body ?? [];\nlet last = -1;\ncomments.forEach((c, i) => { if ((c.body ?? '').trimStart().startsWith('<!-- factory:spec -->')) last = i; });\nif (last < 0) return [];\n\nconst rest = body => body.trimStart().split('\\n').slice(1).join('\\n').trim();\nconst qa = [];\nfor (const c of comments.slice(last + 1)) {\n  const body = (c.body ?? '').trimStart();\n  if (body.startsWith('<!-- factory:question -->')) qa.push('Agent asked:\\n' + rest(body));\n  else if (!body.startsWith('<!-- factory:') && c.user?.login === 'AdamHoppe98') qa.push('Adam:\\n' + body.trim());\n}\nreturn [{ json: { issue: issue.number, title: issue.title, spec: rest(comments[last].body), qa: qa.join('\\n\\n') } }];"
+      },
+      "notes": "Why Code: finds the latest spec among the comments and builds the Q&A, like run-manual.sh."
+    },
+    {
+      "id": "a2000000-0000-4000-8000-000000000011",
+      "name": "Remove Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
         "method": "DELETE",
-        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick approved issue').first().json.number }}/labels/Approved",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Build run request').first().json.issue }}/labels/Approved",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
@@ -94,7 +156,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
+        1540,
         0
       ],
       "parameters": {
@@ -129,12 +191,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1760,
         0
       ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Pick approved issue').first().json.number }}/labels",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Build run request').first().json.issue }}/labels",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendBody": true,
@@ -156,13 +218,74 @@
       }
     },
     {
+      "id": "a4000000-0000-4000-8000-000000000004",
+      "name": "Start run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8787/runs",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build run request').first().json) }}"
+      },
+      "onError": "continueRegularOutput",
+      "notes": "202 = started. 409 (busy), another error, or no connection: the issue goes back to Approved."
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000005",
+      "name": "Run started?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "r1",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 202,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "a2000000-0000-4000-8000-000000000005",
-      "name": "Post run command",
+      "name": "Post run started",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
       "position": [
-        1320,
-        0
+        2420,
+        -140
       ],
       "parameters": {
         "resource": "issue",
@@ -177,8 +300,8 @@
           "mode": "name",
           "value": "Factory"
         },
-        "issueNumber": "={{ $('Pick approved issue').first().json.number }}",
-        "body": "=<!-- factory:status -->\n**Building.** Start the agent by hand on the Mac, from the Factory repo:\n\n```\nscripts/run-manual.sh {{ $('Pick approved issue').first().json.number }}\n```\n\nIt works on branch `issue-{{ $('Pick approved issue').first().json.number }}` with the latest spec. When the agent is done, push the branch and open a PR with `Closes #{{ $('Pick approved issue').first().json.number }}`. WF3 then moves this issue to `Your QA`.\n\nIf the agent has a question, answer it here and set `Approved` again. If it gets stuck, set `Stuck`."
+        "issueNumber": "={{ $('Build run request').first().json.issue }}",
+        "body": "=<!-- factory:status -->\n**Building.** The runner started run `{{ $json.body.run_id }}` on branch `issue-{{ $('Build run request').first().json.issue }}`.\n<!-- run: {{ $json.body.run_id }} -->\n\nWF4 checks the run every minute. When the agent is done, it opens the PR and moves this issue to `Your QA`. A question from the agent comes here as a comment, and the issue goes to `Waiting for you`."
       },
       "credentials": {
         "githubApi": {
@@ -186,7 +309,105 @@
           "name": "Github Factory"
         }
       },
-      "notes": "Basic A: Adam runs the agent. Basic B (T2.4) replaces this with POST /runs."
+      "notes": "Keep '**Building.**': WF3 compares PR times with this comment. WF4 reads the run id from the hidden run marker."
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000006",
+      "name": "Remove Building",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        140
+      ],
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Build run request').first().json.issue }}/labels/Building",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      },
+      "notes": "Run didn't start: undo Building, unless Adam changed the state meanwhile."
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000007",
+      "name": "Still Building?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2640,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "s1",
+              "leftValue": "={{ $json.statusCode === 200 && !$json.body.some(l => ['Ideas', 'Refining', 'Ready for approval', 'Approved', 'Building', 'Waiting for you', 'Stuck', 'Your QA', 'Done'].includes(l.name)) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "200 = the old state label was there. If Adam set another state meanwhile, his label wins."
+    },
+    {
+      "id": "a4000000-0000-4000-8000-000000000008",
+      "name": "Add Approved back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/AdamHoppe98/Factory/issues/{{ $('Build run request').first().json.issue }}/labels",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: ['Approved'] }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "CcLRRNf9ryjsAy1J",
+          "name": "Github Factory"
+        }
+      }
     }
   ],
   "connections": {
@@ -213,6 +434,40 @@
       ]
     },
     "Pick approved issue": {
+      "main": [
+        [
+          {
+            "node": "Runner up?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runner up?": {
+      "main": [
+        [
+          {
+            "node": "Get comments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get comments": {
+      "main": [
+        [
+          {
+            "node": "Build run request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build run request": {
       "main": [
         [
           {
@@ -250,11 +505,63 @@
       "main": [
         [
           {
-            "node": "Post run command",
+            "node": "Start run",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Start run": {
+      "main": [
+        [
+          {
+            "node": "Run started?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run started?": {
+      "main": [
+        [
+          {
+            "node": "Post run started",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Remove Building",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Building": {
+      "main": [
+        [
+          {
+            "node": "Still Building?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Building?": {
+      "main": [
+        [
+          {
+            "node": "Add Approved back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
