@@ -14,9 +14,14 @@ stuck, a missing or invalid block, an unknown status, a non-zero exit, a timeout
 or a push failure -> state "stuck".
 State lives in memory and is saved to runner/state/runs.json.
 
-Env vars: RUNNER_AGENT_CMD (replaces `claude -p`, prompt on stdin),
-RUNNER_TIMEOUT (seconds, default 1800), RUNNER_REPO_ROOT, RUNNER_WORKTREES_DIR,
-RUNNER_LOGS_DIR.
+Env vars (all optional, defaults in brackets):
+  RUNNER_PORT           HTTP port [8787]
+  RUNNER_STATE_DIR      folder for runs.json [runner/state]
+  RUNNER_AGENT_CMD      replaces `claude -p`, prompt on stdin [unset: `claude -p`]
+  RUNNER_TIMEOUT        run timeout in seconds [1800]
+  RUNNER_REPO_ROOT      repo the worktrees are made from [parent of runner/]
+  RUNNER_WORKTREES_DIR  where worktrees are created [runner/worktrees]
+  RUNNER_LOGS_DIR       where run logs are written [runner/logs]
 """
 import json
 import os
