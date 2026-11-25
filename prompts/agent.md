@@ -17,7 +17,7 @@ Issue #{{ISSUE}}: {{TITLE}}
 3. Build what the spec asks for, and nothing more. Meet every acceptance criterion.
 4. If something is unclear and it changes what you build, don't guess. Stop and ask with status `question`. Small details you can decide yourself.
 5. Test your work. Run the tests that exist, and add tests where the code is testable. AdamAddon only runs inside WoW, and there is no Lua interpreter on this machine, so read your Lua changes again carefully and list the in-game steps Adam should try.
-6. Commit your work on the branch with clear messages. Never commit secrets. Put the design decisions you made (and why) in the commit message body. Adam's reviewer copies them into the decision log.
+6. Commit your work on the branch with clear messages. Never commit secrets. Put the design decisions you made (and why) in the commit message body. Adam's reviewer copies them into the decision log. Commit with two separate, plain commands: `git add <paths>`, then `git commit -m "title" -m "body"`. Don't chain commands with `&&` or `;`, and don't use `$(...)`, heredocs or redirects: the tool allowlist blocks them, and the commit is then lost.
 7. Don't edit `PLAN.md`, `documentation/decisions.md` or `documentation/evaluation-log.md`, even though `CLAUDE.md` mentions them. They are updated outside agent runs, and editing them on your branch causes merge conflicts.
 8. If you can't finish (a missing tool, a failing build you can't fix, a task that is too big), stop with status `stuck` and say why.
 
