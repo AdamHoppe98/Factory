@@ -1,0 +1,31 @@
+# Pushes projects/AdamAddon to github.com/AdamHoppe98/AdamAddon after a merge,
+# so the addon repo stays in sync without a manual `git subtree push`.
+# Plain push, never force: if AdamAddon has commits Factory doesn't have,
+# this fails and Adam runs `git subtree pull` once (see documentation/adamaddon-sync.md).
+name: Sync AdamAddon
+
+on:
+  push:
+    branches: [main]
+    paths: ["projects/AdamAddon/**"]
+  workflow_dispatch:
+
+concurrency: sync-adamaddon
+
+jobs:
+  subtree-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # subtree split needs the full history
+          persist-credentials: false  # use ADAMADDON_TOKEN, not the Factory token
+
+      - name: Push subtree to AdamAddon main
+        env:
+          TOKEN: ${{ secrets.ADAMADDON_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git subtree push --prefix=projects/AdamAddon \
+            "https://x-access-token:${TOKEN}@github.com/AdamHoppe98/AdamAddon.git" main

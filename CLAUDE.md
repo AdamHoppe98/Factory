@@ -17,7 +17,7 @@ Full assignment: `Exam.project.description.md`. Plan and task status: `PLAN.md`.
 - **AI step:** Ollama `qwen3:8b` at `http://host.docker.internal:11434`. The prompt is in `prompts/refine.md`, the template in `templates/spec-template.md`.
 - **Runner:** Python on the Mac host, port 8787, in `runner/`. One run at a time, 30-minute timeout, git worktree per run.
 - **Coding agent:** `claude -p` with Sonnet (subscription login). The prompt wrapper is in `prompts/agent.md`.
-- **Built project:** `projects/AdamAddon/`, a git subtree of `github.com/AdamHoppe98/AdamAddon` (a Lua WoW addon).
+- **Built project:** `projects/AdamAddon/`, a git subtree of `github.com/AdamHoppe98/AdamAddon` (a Lua WoW addon). A GitHub Action pushes it to the AdamAddon repo after every merge (`documentation/adamaddon-sync.md`).
 
 ## Conventions
 - State labels (exactly one per issue): `Ideas`, `Refining`, `Ready for approval`, `Approved`, `Building`, `Waiting for you`, `Stuck`, `Your QA`, `Done`.
@@ -39,5 +39,5 @@ Full assignment: `Exam.project.description.md`. Plan and task status: `PLAN.md`.
 - **Factory agent runs:** work only on branch `issue-N`, never push to `main`. Adam reviews the PR.
 - Never merge PRs and never force-push. Adam merges.
 - Never commit secrets: no tokens, API keys or n8n credentials. Use env vars. `.env` and local MCP secrets are git-ignored.
-- Don't edit `projects/AdamAddon/` outside a task that targets it. Sync it with `git subtree pull`, never by hand-copying files.
+- Don't edit `projects/AdamAddon/` outside a task that targets it. Sync it with `git subtree pull`, never by hand-copying files. Addon changes go through Factory, not straight into the AdamAddon repo.
 - If something is unclear, ask instead of guessing. That goes for interactive sessions and agent runs alike.
