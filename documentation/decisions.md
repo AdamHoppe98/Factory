@@ -145,6 +145,10 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Allowlist gap: `Bash(python3:*)` lets the agent run any Python, including `git push` or network calls through `subprocess`. So the allowlist is not a security boundary, only a guardrail. Narrowing it to test commands is moved to T2.3. The real boundary is the container in T3.2. (Report: a tool allowlist only limits honest mistakes. Isolation needs a sandbox.)
 - `claude -p` prints only the final message, so the log is the final answer, not the whole session. Enough for T2.3 parsing. A full transcript (`--output-format stream-json`) can be added later if needed.
 
+## 2026-11-25 – Agents don't edit the shared docs
+- Problem: both agent PRs so far (#14, #16) conflicted with `main`, because the agent and the interactive session both append to `decisions.md` (and `PLAN.md`) while the agent's branch is open. GitHub can't merge two appends at the end of the same file.
+- Rule (Adam agreed): agent runs don't edit `PLAN.md`, `decisions.md` or `evaluation-log.md`. The agent writes its design decisions in the commit message body, and the review copies them into `decisions.md`. Commit messages survive in both Basic A and B and show up in the PR. The agent's final chat message is lost in Basic A (#11).
+- `agent.md` rule 7 and a note at the top of CLAUDE.md's "How we work" section. Without the CLAUDE.md note, the agent would see two rules that contradict each other.
 ## 2026-11-25 – T2.2 runner execution (#15)
 - `POST /runs` returns 400 without a positive numeric `issue`, stores `title`/`spec`/`qa`, then runs the agent in a background thread (202 at once). Run states: `running` → `done` (exit 0 and push ok) or `stuck` (non-zero exit, timeout, worktree or push failure). T2.3 will add `question` parsing.
 - Worktree `runner/worktrees/issue-N`: reused if present, else created from local `issue-N`, `origin/issue-N` or `origin/main` (in that order). Prompt comes from `prompts/agent.md`; empty Q&A becomes `None`; the prompt goes to the agent on stdin.
