@@ -4,6 +4,7 @@ Exam project: a small software factory. GitHub issues are the specs, n8n orchest
 Full assignment: `Exam.project.description-version.2.md` (version 2 has the detailed Advanced part). Plan and task status: `PLAN.md`.
 
 ## How we work (important)
+These rules are for interactive sessions with Adam. **Factory agent runs** (`prompts/agent.md`) don't edit `PLAN.md`, `documentation/decisions.md` or `documentation/evaluation-log.md`. They put their decisions in the commit message body, and the review copies them into `decisions.md`.
 - **Don't build everything in one go.** Follow `PLAN.md`: one task at a time, in order, and only after the plan is approved.
 - When a task starts, mark it `[~]` in `PLAN.md`. When it's done and verified, mark it `[x]`.
 - **Log every factory decision** in `documentation/decisions.md` as a short line with the why. It is input for the 5-page report.
