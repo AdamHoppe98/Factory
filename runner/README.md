@@ -12,6 +12,10 @@ scripts/start-runner.sh
 
 Keep the terminal open. The script refuses to start if port 8787 is taken, runs `git pull --ff-only`, then starts `python3 runner/main.py`. From n8n in Docker the runner is at `http://host.docker.internal:8787`.
 
+After changing runner/ code, restart the runner with scripts/start-runner.sh.
+
+`prompts/agent.md` is read from `origin/main` (`git show origin/main:prompts/agent.md`) on every run, so merged prompt changes apply without a pull. If that fails (offline, no `origin/main`), the local file is used.
+
 ## API
 
 | Endpoint | Description |
