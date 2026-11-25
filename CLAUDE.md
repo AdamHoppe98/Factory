@@ -32,7 +32,7 @@ These rules are for interactive sessions with Adam. **Factory agent runs** (`pro
 
 ## n8n workflows
 - They live as JSON in `n8n/workflows/`, one file per workflow (WF1 Refine, WF2 Start, WF3 Track PRs, WF4 Collect results).
-- Change them in a PR. Adam imports them into n8n by hand after review, and that import is part of QA.
+- Change them in a PR. Since T2.7 (Adam's choice), Claude deploys workflow changes to n8n itself with the n8n MCP (allowed in the local `.claude/settings.local.json`) and checks that the **published** version matches the repo JSON. Adam reviews the PR. New workflows are still created inactive, and Adam activates them.
 - The n8n MCP server (`.mcp.json`) can be used to build and test workflows. Export the final JSON back into the repo.
 
 ## Safety rules

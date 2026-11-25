@@ -25,7 +25,9 @@ import json, os, sys
 
 issue = json.loads(os.environ["ISSUE_JSON"])
 comments = issue["comments"]
-spec_idx = [i for i, c in enumerate(comments) if c["body"].lstrip().startswith("<!-- factory:spec -->")]
+# Only marker comments by AdamHoppe98 count (n8n posts as Adam). The repo is public.
+mine = lambda c: c["author"]["login"] == "AdamHoppe98"
+spec_idx = [i for i, c in enumerate(comments) if mine(c) and c["body"].lstrip().startswith("<!-- factory:spec -->")]
 if not spec_idx:
     sys.exit(f"Issue #{os.environ['N']} has no factory:spec comment. Refine it first.")
 
@@ -35,9 +37,9 @@ spec = comments[spec_idx[-1]]["body"].split("\n", 1)[1].strip()
 qa = []
 for c in comments[spec_idx[-1] + 1:]:
     body = c["body"].lstrip()
-    if body.startswith("<!-- factory:question -->"):
+    if mine(c) and body.startswith("<!-- factory:question -->"):
         qa.append("Agent asked:\n" + body.split("\n", 1)[1].strip())
-    elif not body.startswith("<!-- factory:") and c["author"]["login"] == "AdamHoppe98":
+    elif not body.startswith("<!-- factory:") and mine(c):
         qa.append("Adam:\n" + body.strip())
 
 text = open(os.environ["TEMPLATE"]).read()

@@ -84,7 +84,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// Takes the run id from the latest status comment with a <!-- run: ID --> marker.\n// Building issues without one (Basic A manual runs) are skipped.\nconst issues = $('List Building issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const ids = (item.json.body ?? [])\n    .map(c => /<!-- run: ([\\w-]+) -->/.exec(c.body ?? ''))\n    .filter(Boolean).map(m => m[1]);\n  if (!issue.number || ids.length === 0) return [];\n  return [{ json: { number: issue.number, title: issue.title, runId: ids[ids.length - 1] }, pairedItem: { item: i } }];\n});"
+        "jsCode": "// Takes the run id from the latest status comment with a <!-- run: ID --> marker.\n// Building issues without one (Basic A manual runs) are skipped.\nconst issues = $('List Building issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const ids = (item.json.body ?? []).filter(c => c.user?.login === 'AdamHoppe98')\n    .map(c => /<!-- run: ([\\w-]+) -->/.exec(c.body ?? ''))\n    .filter(Boolean).map(m => m[1]);\n  if (!issue.number || ids.length === 0) return [];\n  return [{ json: { number: issue.number, title: issue.title, runId: ids[ids.length - 1] }, pairedItem: { item: i } }];\n});"
       },
       "notes": "Why Code: finds the run id marker in the latest WF2 v2 status comment of each Building issue."
     },

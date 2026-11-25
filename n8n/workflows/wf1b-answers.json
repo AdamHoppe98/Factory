@@ -84,7 +84,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// An issue is answered when Adam wrote a plain comment after the agent's\n// latest factory:question comment.\nconst issues = $('List waiting issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const comments = item.json.body ?? [];\n  let q = -1;\n  comments.forEach((c, j) => { if ((c.body ?? '').trimStart().startsWith('<!-- factory:question -->')) q = j; });\n  const answered = comments.slice(q + 1).some(c =>\n    c.user?.login === 'AdamHoppe98' && !(c.body ?? '').trimStart().startsWith('<!-- factory:'));\n  if (!issue.number || issue.user?.login !== 'AdamHoppe98' || q < 0 || !answered) return [];\n  return [{ json: { number: issue.number }, pairedItem: { item: i } }];\n});"
+        "jsCode": "// An issue is answered when Adam wrote a plain comment after the agent's\n// latest factory:question comment.\nconst issues = $('List waiting issues').all();\nreturn $input.all().flatMap((item, i) => {\n  const issue = issues[i].json;\n  const comments = item.json.body ?? [];\n  let q = -1;\n  comments.forEach((c, j) => { if (c.user?.login === 'AdamHoppe98' && (c.body ?? '').trimStart().startsWith('<!-- factory:question -->')) q = j; });\n  const answered = comments.slice(q + 1).some(c =>\n    c.user?.login === 'AdamHoppe98' && !(c.body ?? '').trimStart().startsWith('<!-- factory:'));\n  if (!issue.number || issue.user?.login !== 'AdamHoppe98' || q < 0 || !answered) return [];\n  return [{ json: { number: issue.number }, pairedItem: { item: i } }];\n});"
       },
       "notes": "Why Code: finds the latest agent question among the comments and checks for Adam's answer after it."
     },
