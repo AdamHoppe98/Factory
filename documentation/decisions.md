@@ -88,3 +88,11 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Adam activates WF1 in n8n. The auto-mode permission check blocked Claude from activating it, which matches the rule that putting a workflow live is Adam's QA step. Claude creates the workflow inactive in n8n, and the JSON goes in by PR.
 - Test with issue #3, after Adam activated WF1: `Ideas` → `Refining` → `Ready for approval` with a spec in 42 s (execution 29). Polls with nothing to do take about 1 s (executions 30–32) and don't refine #3 again. A comment from Adam sent #3 back through `Refining`, and the new spec in about 80 s (execution 33) used the comment: tooltip instead of a page, the named WoW API, no saved settings, questions cleared. The run after that did nothing, so there's no loop.
 - Spec quality on #3 (report): the first spec planned an `AdamAddonDB` schema change nobody asked for, and its open questions were technical ("which API?"), not questions for Adam. The second spec kept an old test step (`/adam bagspace`) that no longer fit. This matches the T1.2 finding: Adam's review in `Ready for approval` is needed.
+
+## 2026-11-25 – T1.4 WF2 Start task (Basic A)
+- WF2 polls every minute. If any open issue is `Building`, it does nothing. Otherwise it takes Adam's oldest `Approved` issue, sets `Building` and posts a `factory:status` comment with the command `scripts/run-manual.sh N` (written in T1.6). Why: the assignment says one task is built at a time, and the oldest goes first, like a queue.
+- The label is set before the comment, so the next poll sees `Building` and doesn't start a second task.
+- The "only one Building" check counts every open issue, not only Adam's, because the limit is about the machine, not the author.
+- A small Code node holds the rule. It needs all issues at once (is anything Building, then sort and take the first), which would otherwise take Filter + Aggregate + IF + Sort + Limit.
+- In Basic A, Adam moves the task on by hand after the run (PR → WF3, question → comment and `Approved`, failure → `Stuck`). T2.4 replaces the comment with `POST /runs`.
+- Claude doesn't set `Approved`, not even on test issues. The auto-mode permission check blocked it, which enforces the "only Adam approves" rule. Claude creates the test issues, and Adam approves them.
