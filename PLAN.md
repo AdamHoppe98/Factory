@@ -114,7 +114,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [~] **T1.8** GitHub Action `sync-adamaddon.yml`: after a merge to `main` that changes `projects/AdamAddon/**`, push the subtree to the AdamAddon repo. *Added 2026-11-25 by Adam's request.*
 
 ### Phase 2 – Basic B (automated factory)
-- [ ] **T2.1** Runner skeleton: HTTP API, in-memory and JSON-file run state, one run at a time, tests.
+- [x] **T2.1** Runner skeleton: HTTP API, in-memory and JSON-file run state, one run at a time, tests.
 - [ ] **T2.2** Runner execution: git worktree, `claude -p` with an allowlist, 30-minute timeout, branch push.
 - [ ] **T2.3** Runner result parsing for the status contract, plus tests with fake agent output.
 - [ ] **T2.4** WF2 v2: call `POST /runs`.
