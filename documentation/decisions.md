@@ -119,3 +119,7 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - It runs in a git worktree at `runner/worktrees/issue-N` (git-ignored), the same place the runner will use. Adam's main checkout is never switched to another branch. An existing local or pushed `issue-N` branch is continued, so a task sent back to `Approved` builds on its earlier work.
 - Claude Code runs interactively (`claude --model sonnet "<prompt>"`), so in Basic A Adam watches and approves each tool call. Afterwards the script offers to push the branch and open the PR with `Closes #N`, and WF3 then sets `Your QA`.
 - Guards: the script refuses an issue that isn't `Building`, or that has no spec. `--dry-run` prints the prompt. Checked on #3 (uses the newer of the two specs, no placeholders left), #3 without dry-run (stopped: not Building) and #8 (stopped: no spec).
+
+## 2026-11-25 – T1.7 questions during a manual run
+- First real run (#11): the agent asked a question, and Adam answered it in the Claude Code CLI. That works in Basic A, because the session keeps the context, but the Q&A is then missing from GitHub: no trace for the evaluation, and a later run of the same issue wouldn't know the answer.
+- Rule for Basic A: if Adam answers in the CLI, the question is copied to the issue as a `factory:question` comment and the answer as Adam's plain comment, so `run-manual.sh` includes it as Q&A next time. The full loop (`Waiting for you` → comment → `Approved` → new run) is automated in Basic B by WF4 and WF1 v2.
