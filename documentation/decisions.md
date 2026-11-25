@@ -172,3 +172,11 @@ Review (Claude): 18/18 tests pass, including all the fake-output cases from the 
 - The health check comes before any label change: with the runner down, nothing changes on GitHub, so the labels don't flip every minute.
 - WF4 (T2.5) finds the run id in the latest status comment, so the runner doesn't need a "list runs" endpoint. The comment keeps `**Building.**`, because WF3 uses it to check that a PR is newer than the build start.
 - `scripts/start-runner.sh` starts the runner in a terminal (it pulls `main` first, and refuses if port 8787 is taken). A stale skeleton runner from the #12 run was still on port 8787. Claude was not allowed to stop Adam's process, so Adam stops it.
+
+## 2026-11-25 – T2.5 WF4 Collect results
+- WF4 (`UQpsW3cgTGrpT8Rq`, created inactive) polls every minute: `Building` issues → run id from the latest `<!-- run: ID -->` comment (Basic A runs have none and are skipped) → `GET /runs/{id}` → a Switch on the state.
+- `done` → open the PR (`Closes #N`, the agent's summary and tests, the run id) → `Your QA`. A 422 (the PR already exists, for example a rerun after QA) is fine, and the issue still goes to `Your QA`.
+- `question` → a `factory:question` comment with the question → `Waiting for you`. The format is the one WF2 v2 and `run-manual.sh` already read as Q&A, so the next run gets the question and Adam's answer.
+- `stuck` → a status comment with the summary and the end of the log → `Stuck`.
+- `running`, the runner down, or an unknown run: nothing happens, and the next poll checks again. All three results share one guarded label move.
+- WF3 can also move `Building` → `Your QA` when the PR appears. The guarded move makes the two safe together: whichever comes second gets a 404 and does nothing.
