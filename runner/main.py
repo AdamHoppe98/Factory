@@ -55,9 +55,22 @@ def repo_root():
     return os.environ.get("RUNNER_REPO_ROOT") or os.path.dirname(HERE)
 
 
-def build_prompt(run):
+def load_prompt_template():
+    """Prefer prompts/agent.md from origin/main; fall back to the local file."""
+    root = repo_root()
+    try:
+        git(["fetch", "origin", "main"], root)  # best effort; offline keeps the old origin/main
+        r = git(["show", "origin/main:prompts/agent.md"], root)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout
+    except OSError:
+        pass
     with open(PROMPT_PATH) as f:
-        text = f.read()
+        return f.read()
+
+
+def build_prompt(run):
+    text = load_prompt_template()
     values = {
         "ISSUE": str(run["issue"]),
         "TITLE": run["title"],
