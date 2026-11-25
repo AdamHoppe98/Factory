@@ -184,3 +184,8 @@ Review (Claude): 18/18 tests pass, including all the fake-output cases from the 
 - `running`, the runner down, or an unknown run: nothing happens, and the next poll checks again. All three results share one guarded label move.
 - WF3 can also move `Building` → `Your QA` when the PR appears. The guarded move makes the two safe together: whichever comes second gets a 404 and does nothing.
 - T2.5 test: after Adam activated WF4, #20 (run `ea86a86485ae`, already `done`) got PR #22, opened by WF4 with the agent's summary, tests and run id, and moved to `Your QA` within a minute. The published WF4 matches the repo JSON (12 nodes, same connections). Idea → spec → approval → automatic build → PR, with no manual build step: the core of Basic B works.
+
+## 2026-11-25 – T2.6 answers go back to Approved
+- New small workflow **WF1b Answer to Approved** (`yDNJwDy9UAJG6PvH`) instead of changing WF1 again. Why: Claude can't change a live workflow, so a WF1 change would need yet another new WF1 and a swap, with the draft/published risk from T2.4. A separate workflow is one thing to activate. The assignment gives this job to WF1. In n8n it's now split into two workflows.
+- Rule: an issue in `Waiting for you` (by Adam) with a plain comment from Adam after the latest `factory:question` → guarded move to `Approved`. Then WF2 v2 starts a new run, and its Q&A already includes the question and Adam's answer. The runner reuses the `issue-N` worktree and branch, so the agent continues where it stopped.
+- This is the one place where n8n sets `Approved`, as the assignment says for Basic B. CLAUDE.md updated.
