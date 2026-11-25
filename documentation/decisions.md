@@ -102,3 +102,11 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - WF2 itself worked on its first scheduled run: #6 was the only `Approved` issue, became `Building` and got the run-command comment (execution 69).
 - Test after Adam imported the fix: #5 `Approved` stayed waiting while #6 was `Building`. After #6 was closed, #5 became `Building` with the run command within about 60 s. One task at a time works.
 - In n8n, the import swapped the IDs: WF1 Refine is now `hlHnpqcmA3FWN14F` and WF2 Start task is `5jO4gJgmN7w72ETv`. Workflows are matched by name, not by ID, so nothing depends on it.
+
+## 2026-11-25 – T1.5 WF3 Track PRs
+- WF3 polls every minute and reads three lists: open issues, issues closed in the last 2 days, and open PRs. A Code node joins them by issue number and lists the moves. Each move uses the same guarded label move as WF1 and WF2.
+- Closed issue with a state label other than `Done` → `Done`. That covers a merged PR (`Closes #N` closes the issue) and an issue Adam closes himself. The 2-day window keeps the list short, and an issue already at `Done` drops out.
+- Open PR from `issue-N` → `Your QA`, but **only from `Building`**, and only if the PR changed after WF2's latest "Building" comment. Why: when Adam sends a task back from `Your QA` to `Approved`, the PR stays open. A plain "open PR → Your QA" rule would undo Adam's choice on the next poll, or skip the rebuild as soon as WF2 starts it.
+- A closed PR that wasn't merged changes nothing. The issue stays where it is, and Adam decides (`Approved` to retry, or close the issue).
+- The list nodes always output data, so an empty list (for example no open PRs) doesn't stop the run before the `Done` moves.
+- Test after Adam activated WF3: the closed test issues #3, #5 and #6 got `Done` on the first run. Test issue #8 (`Building`, via WF2) moved to `Your QA` about 30 s after a PR from `issue-8` was opened (PR #10). The PR was closed without merging, and then #8 was closed. #8 got `Done` within about 50 s.
