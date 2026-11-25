@@ -100,3 +100,5 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - Fix in WF1 and WF2: every state change is a guarded move. `DELETE` the old state label, then add the new one only if the old one was there (HTTP 200) and no other state label is set. A label Adam sets during a run always wins. Non-state labels are never touched, so the `otherLabels` snapshot is gone.
 - The permission check also blocks Claude from updating a live workflow in n8n. So Claude creates new workflows inactive, and Adam imports changes to existing ones from the PR JSON. That matches the "import is QA" rule.
 - WF2 itself worked on its first scheduled run: #6 was the only `Approved` issue, became `Building` and got the run-command comment (execution 69).
+- Test after Adam imported the fix: #5 `Approved` stayed waiting while #6 was `Building`. After #6 was closed, #5 became `Building` with the run command within about 60 s. One task at a time works.
+- In n8n, the import swapped the IDs: WF1 Refine is now `hlHnpqcmA3FWN14F` and WF2 Start task is `5jO4gJgmN7w72ETv`. Workflows are matched by name, not by ID, so nothing depends on it.
