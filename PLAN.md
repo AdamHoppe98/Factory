@@ -109,7 +109,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] **T1.3** Build WF1 Refine. Export it to `n8n/workflows/`.
 - [x] **T1.4** Build WF2 Start task (Basic A version: sets `Building` and posts the manual command).
 - [x] **T1.5** Build WF3 Track PRs.
-- [ ] **T1.6** Write `prompts/agent.md` and `scripts/run-manual.sh <issue>`, which creates the branch and starts Claude Code with the spec.
+- [x] **T1.6** Write `prompts/agent.md` and `scripts/run-manual.sh <issue>`, which creates the branch and starts Claude Code with the spec.
 - [ ] **T1.7** Run 2–3 real tasks end to end, for example T2.1 built by the factory. Log each run in `evaluation-log.md`.
 
 ### Phase 2 – Basic B (automated factory)

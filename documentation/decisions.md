@@ -110,3 +110,12 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 - A closed PR that wasn't merged changes nothing. The issue stays where it is, and Adam decides (`Approved` to retry, or close the issue).
 - The list nodes always output data, so an empty list (for example no open PRs) doesn't stop the run before the `Done` moves.
 - Test after Adam activated WF3: the closed test issues #3, #5 and #6 got `Done` on the first run. Test issue #8 (`Building`, via WF2) moved to `Your QA` about 30 s after a PR from `issue-8` was opened (PR #10). The PR was closed without merging, and then #8 was closed. #8 got `Done` within about 50 s.
+
+## 2026-11-25 – T1.6 agent prompt and manual run
+- `prompts/agent.md` has `{{ISSUE}}`, `{{TITLE}}`, `{{SPEC}}` and `{{QA}}` placeholders. The runner (T2.2) will fill in the same file, so Basic A and Basic B give the agent the same prompt.
+- Agent rules: stay on `issue-N` and don't push (the factory pushes), only change files in the Target, ask with status `question` instead of guessing when it changes what gets built, test the work, and end with the JSON status block from CLAUDE.md.
+- There's no Lua interpreter on the Mac, so the prompt tells the agent to reread its Lua changes and list in-game test steps, rather than claim tests it can't run. (Report: AdamAddon QA is mostly manual.)
+- `scripts/run-manual.sh N` uses the latest `factory:spec` comment, plus the agent's `factory:question` comments and Adam's comments after it as Q&A. Status comments are left out.
+- It runs in a git worktree at `runner/worktrees/issue-N` (git-ignored), the same place the runner will use. Adam's main checkout is never switched to another branch. An existing local or pushed `issue-N` branch is continued, so a task sent back to `Approved` builds on its earlier work.
+- Claude Code runs interactively (`claude --model sonnet "<prompt>"`), so in Basic A Adam watches and approves each tool call. Afterwards the script offers to push the branch and open the PR with `Closes #N`, and WF3 then sets `Your QA`.
+- Guards: the script refuses an issue that isn't `Building`, or that has no spec. `--dry-run` prints the prompt. Checked on #3 (uses the newer of the two specs, no placeholders left), #3 without dry-run (stopped: not Building) and #8 (stopped: no spec).
