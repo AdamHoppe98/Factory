@@ -164,3 +164,11 @@ Copied from the agent's commit body (the new rule worked: the PR touched only `r
 - Allowlist: `Bash(python3:*)` and `Bash(python:*)` replaced by `Bash(python3 -m unittest:*)`. pytest was left out (not used in this repo). Still a guardrail only: tests the agent writes can run any code. T3.2 is the boundary.
 - `TEST_AGENT_CMD`/`TEST_TIMEOUT` renamed to `RUNNER_AGENT_CMD`/`RUNNER_TIMEOUT`, with no fallback.
 Review (Claude): 18/18 tests pass, including all the fake-output cases from the issue. PR #18 merges cleanly with `main`, and #14 and #16 did not.
+
+## 2026-11-25 – T2.4 WF2 v2 (runner) and how n8n tasks are built
+- T2.4 and T2.5 are built by Claude in an interactive session, not through the factory: a factory agent has no n8n access and can't test a workflow, and the n8n MCP is only in the interactive session. (Report: the factory's limit is what the agent can verify.)
+- WF2 v2 is a new workflow (`2EP4qQO2r7LETG6I`, inactive), because Claude can't change the live WF2. Adam deactivates WF2 and activates v2. The JSON replaces `n8n/workflows/wf2-start.json`.
+- Flow: oldest `Approved` issue (nothing `Building`) → `GET /health` → comments → the same spec and Q&A rules as `run-manual.sh` → guarded move to `Building` → `POST /runs`. On 202, a status comment with the run id in a hidden `<!-- run: ID -->` marker. Otherwise (409, error, no connection) the issue goes back to `Approved` and is retried on the next poll.
+- The health check comes before any label change: with the runner down, nothing changes on GitHub, so the labels don't flip every minute.
+- WF4 (T2.5) finds the run id in the latest status comment, so the runner doesn't need a "list runs" endpoint. The comment keeps `**Building.**`, because WF3 uses it to check that a PR is newer than the build start.
+- `scripts/start-runner.sh` starts the runner in a terminal (it pulls `main` first, and refuses if port 8787 is taken). A stale skeleton runner from the #12 run was still on port 8787. Claude was not allowed to stop Adam's process, so Adam stops it.
