@@ -76,3 +76,15 @@ Adam approved `PLAN.md`. The only change: T0.3 became a setup guide instead of a
 
 ## 2026-11-24 – Commit and push rule
 - Adam: interactive Claude sessions may commit and push on their own judgment, `main` included. Why: this is an AI-focused project, and asking every time slows the work down. Factory agent runs still only push `issue-N` branches, and Adam still merges every PR. CLAUDE.md updated.
+
+## 2026-11-24 – T1.3 WF1 Refine
+- WF1 polls every minute and refines **one** issue per run: an `Ideas` issue, or a `Ready for approval` issue with a comment from Adam after the latest spec. The oldest issue goes first. Why: Ollama handles one request at a time anyway, and one issue per run keeps the execution log easy to read.
+- The label is set to `Refining` before the model runs. A run takes about a minute, and the next poll skips issues in `Refining`, so the same issue isn't refined twice.
+- If Ollama fails (after 1 retry), the issue goes back to its old label, and the next poll tries again. `Refining` never gets stuck because of an Ollama error.
+- Labels are set with `PUT /issues/N/labels`. It replaces all labels in one call, keeps non-state labels (such as `bug`) and swaps only the state label. The native GitHub node's label field can't build a list from an expression.
+- GitHub calls use HTTP Request with the `Github Factory` credential when the GitHub node has no matching operation (listing comments, reading a raw file). Posting the spec uses the native GitHub node.
+- The prompt and the template are read from `main` through the GitHub API on every run. A prompt change goes live when Adam merges it, with no re-import in n8n. (Answers the T1.2 question: Adam agreed.)
+- The author filter (only `AdamHoppe98` issues and comments) is already in WF1, because it costs one condition. T2.7 still covers the other workflows.
+- Adam activates WF1 in n8n. The auto-mode permission check blocked Claude from activating it, which matches the rule that putting a workflow live is Adam's QA step. Claude creates the workflow inactive in n8n, and the JSON goes in by PR.
+- Test with issue #3, after Adam activated WF1: `Ideas` → `Refining` → `Ready for approval` with a spec in 42 s (execution 29). Polls with nothing to do take about 1 s (executions 30–32) and don't refine #3 again. A comment from Adam sent #3 back through `Refining`, and the new spec in about 80 s (execution 33) used the comment: tooltip instead of a page, the named WoW API, no saved settings, questions cleared. The run after that did nothing, so there's no loop.
+- Spec quality on #3 (report): the first spec planned an `AdamAddonDB` schema change nobody asked for, and its open questions were technical ("which API?"), not questions for Adam. The second spec kept an old test step (`/adam bagspace`) that no longer fit. This matches the T1.2 finding: Adam's review in `Ready for approval` is needed.
