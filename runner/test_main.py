@@ -8,10 +8,11 @@ import unittest
 import urllib.error
 import urllib.request
 
-from main import make_server, build_prompt
+from main import make_server, build_prompt, parse_status
 
 FAKE_AGENT = """#!/bin/sh
-# Fake agent. FAKE_MODE: success | fail | timeout
+# Fake agent. FAKE_MODE: success | fail | timeout.
+# FAKE_OUTPUT is printed at the end; it defaults to a "done" status block.
 cat > prompt.txt
 echo "agent output line"
 case "$FAKE_MODE" in
@@ -21,7 +22,11 @@ esac
 echo built > built.txt
 git add built.txt
 git commit -q --allow-empty -m "fake work"
+printf '%s\\n' "${FAKE_OUTPUT:-$DONE_BLOCK}"
 """
+
+
+DONE = '```json\n{"status": "done", "summary": "Built it", "question": "", "tests": "ran ok"}\n```'
 
 
 def call(base, method, path, body=None):
@@ -72,9 +77,11 @@ class RunnerTest(unittest.TestCase):
             "RUNNER_REPO_ROOT": self.repo,
             "RUNNER_WORKTREES_DIR": os.path.join(t, "worktrees"),
             "RUNNER_LOGS_DIR": os.path.join(t, "logs"),
-            "TEST_AGENT_CMD": agent,
-            "TEST_TIMEOUT": "30",
+            "RUNNER_AGENT_CMD": agent,
+            "RUNNER_TIMEOUT": "30",
             "FAKE_MODE": "success",
+            "DONE_BLOCK": DONE,
+            "FAKE_OUTPUT": "",
             "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "t@example.com",
             "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "t@example.com",
         }
@@ -126,6 +133,7 @@ class RunnerTest(unittest.TestCase):
         run_id = self.start(title="My title", spec="My spec")
         run = self.wait_done(run_id)
         self.assertEqual(run["state"], "done", run)
+        self.assertEqual((run["summary"], run["tests"]), ("Built it", "ran ok"))
         self.assertIn("agent output line", run["log_tail"])
         wt = os.path.join(self.env["RUNNER_WORKTREES_DIR"], "issue-7")
         self.assertTrue(os.path.isdir(wt))
@@ -149,9 +157,56 @@ class RunnerTest(unittest.TestCase):
                                 capture_output=True, text=True).stdout
         self.assertEqual(remote.strip(), "")
 
+    def branch_pushed(self):
+        out = subprocess.run(["git", "branch", "--list", "issue-7"], cwd=self.origin,
+                             capture_output=True, text=True).stdout
+        return "issue-7" in out
+
+    def run_with_output(self, output):
+        os.environ["FAKE_OUTPUT"] = output
+        return self.wait_done(self.start())
+
+    def test_question_status_pushes(self):
+        run = self.run_with_output(
+            '```json\n{"status": "question", "summary": "s", "question": "Which colour?", "tests": "t"}\n```')
+        self.assertEqual(run["state"], "question", run)
+        self.assertEqual(run["question"], "Which colour?")
+        self.assertTrue(self.branch_pushed())
+
+    def test_stuck_status_does_not_push(self):
+        run = self.run_with_output('```json\n{"status": "stuck", "summary": "No tool"}\n```')
+        self.assertEqual((run["state"], run["summary"]), ("stuck", "No tool"))
+        self.assertFalse(self.branch_pushed())
+
+    def test_missing_block_is_stuck(self):
+        run = self.run_with_output("just text")
+        self.assertEqual(run["state"], "stuck")
+        self.assertIn("No status block", run["summary"])
+        self.assertFalse(self.branch_pushed())
+
+    def test_invalid_json_is_stuck(self):
+        run = self.run_with_output('```json\n{"status": "done",\n```')
+        self.assertEqual(run["state"], "stuck")
+        self.assertIn("Invalid JSON", run["summary"])
+        self.assertFalse(self.branch_pushed())
+
+    def test_unknown_status_is_stuck(self):
+        run = self.run_with_output('```json\n{"status": "maybe"}\n```')
+        self.assertEqual(run["state"], "stuck")
+        self.assertIn("Unknown status", run["summary"])
+
+    def test_last_block_wins_and_trailing_text_ignored(self):
+        run = self.run_with_output(
+            '```json\n{"status": "stuck", "summary": "old"}\n```\n'
+            '```json\n{"status": "done", "summary": "new"}\n```\nbye {"status": "stuck"}')
+        self.assertEqual((run["state"], run["summary"]), ("done", "new"))
+
+    def test_parse_status_missing_file(self):
+        self.assertEqual(parse_status("/nonexistent/x.log")["status"], "stuck")
+
     def test_timeout_kills_agent(self):
         os.environ["FAKE_MODE"] = "timeout"
-        os.environ["TEST_TIMEOUT"] = "1"
+        os.environ["RUNNER_TIMEOUT"] = "1"
         start = time.time()
         run = self.wait_done(self.start())
         self.assertLess(time.time() - start, 20)
@@ -160,7 +215,7 @@ class RunnerTest(unittest.TestCase):
 
     def test_conflict_when_active(self):
         os.environ["FAKE_MODE"] = "timeout"
-        os.environ["TEST_TIMEOUT"] = "2"
+        os.environ["RUNNER_TIMEOUT"] = "2"
         run_id = self.start()
         self.assertEqual(call(self.srv.base, "POST", "/runs", {"issue": 8})[0], 409)
         self.wait_done(run_id)
@@ -180,7 +235,7 @@ class RunnerTest(unittest.TestCase):
 
     def test_persists_after_restart(self):
         os.environ["FAKE_MODE"] = "timeout"
-        os.environ["TEST_TIMEOUT"] = "2"
+        os.environ["RUNNER_TIMEOUT"] = "2"
         run_id = self.start(issue=5)
         self.srv.stop()
         self.srv = Server(self.tmp.name + "/state")

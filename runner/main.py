@@ -7,12 +7,15 @@ Endpoints:
 
 A run executes in a background thread: git worktree runner/worktrees/issue-N
 on branch issue-N, the prompt from prompts/agent.md, then the agent command
-(`claude -p` by default). Exit code 0 -> branch pushed to origin, state "done".
-Anything else (non-zero exit, timeout, push failure) -> state "stuck".
+(`claude -p` by default). On exit code 0 the runner reads the last ```json block
+in the log: {"status": "done|question|stuck", "summary", "question", "tests"}.
+done and question -> branch pushed to origin, state set to the status.
+stuck, a missing or invalid block, an unknown status, a non-zero exit, a timeout
+or a push failure -> state "stuck".
 State lives in memory and is saved to runner/state/runs.json.
 
-Env vars: TEST_AGENT_CMD (replaces `claude -p`, prompt on stdin),
-TEST_TIMEOUT (seconds, default 1800), RUNNER_REPO_ROOT, RUNNER_WORKTREES_DIR,
+Env vars: RUNNER_AGENT_CMD (replaces `claude -p`, prompt on stdin),
+RUNNER_TIMEOUT (seconds, default 1800), RUNNER_REPO_ROOT, RUNNER_WORKTREES_DIR,
 RUNNER_LOGS_DIR.
 """
 import json
@@ -39,7 +42,7 @@ ALLOWED_TOOLS = ",".join([
     "Read", "Edit", "Write", "Glob", "Grep",
     "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
     "Bash(git add:*)", "Bash(git commit:*)", "Bash(git show:*)",
-    "Bash(ls:*)", "Bash(mkdir:*)", "Bash(python3:*)", "Bash(python:*)",
+    "Bash(ls:*)", "Bash(mkdir:*)", "Bash(python3 -m unittest:*)",
 ])
 
 
@@ -60,7 +63,7 @@ def build_prompt(run):
 
 
 def agent_command():
-    cmd = os.environ.get("TEST_AGENT_CMD")
+    cmd = os.environ.get("RUNNER_AGENT_CMD")
     if cmd:
         return shlex.split(cmd)
     return ["claude", "-p", "--model", "sonnet", "--allowedTools", ALLOWED_TOOLS]
@@ -97,6 +100,37 @@ def tail_of(path, lines=LOG_TAIL_LINES):
             return "".join(f.readlines()[-lines:])
     except OSError:
         return ""
+
+
+JSON_BLOCK = re.compile(r"```json[ \t]*\r?\n(.*?)```", re.DOTALL)
+STATUSES = ("done", "question", "stuck")
+
+
+def parse_status(log_path):
+    """Read the last ```json block in the log. Returns a dict with status, summary,
+    question, tests. Problems give status "stuck" with the reason as summary."""
+    def stuck(summary):
+        return {"status": "stuck", "summary": summary, "question": "", "tests": ""}
+
+    try:
+        with open(log_path, errors="replace") as f:
+            blocks = JSON_BLOCK.findall(f.read())
+    except OSError:
+        blocks = []
+    if not blocks:
+        return stuck("No status block found in the agent output.")
+    try:
+        data = json.loads(blocks[-1])
+    except ValueError:
+        return stuck("Invalid JSON in the status block.")
+    if not isinstance(data, dict):
+        return stuck("Invalid JSON in the status block: expected an object.")
+    status = data.get("status")
+    if status not in STATUSES:
+        return stuck("Unknown status %r in the status block." % (status,))
+    result = {k: "" if data.get(k) is None else str(data[k]) for k in ("summary", "question", "tests")}
+    result["status"] = status
+    return result
 
 
 class RunStore:
@@ -167,8 +201,8 @@ def execute_run(store, run):
     log_dir = os.environ.get("RUNNER_LOGS_DIR") or os.path.join(HERE, "logs")
     log_path = os.path.join(log_dir, "issue-%s-%s.log" % (issue, run_id))
 
-    def finish(state, summary):
-        store.update(run_id, state=state, summary=summary, log_tail=tail_of(log_path))
+    def finish(state, summary, **extra):
+        store.update(run_id, state=state, summary=summary, log_tail=tail_of(log_path), **extra)
 
     try:
         os.makedirs(log_dir, exist_ok=True)
@@ -179,7 +213,7 @@ def execute_run(store, run):
             with open(log_path, "w") as f:
                 f.write(err + "\n")
             return finish("stuck", err)
-        timeout = float(os.environ.get("TEST_TIMEOUT") or DEFAULT_TIMEOUT)
+        timeout = float(os.environ.get("RUNNER_TIMEOUT") or DEFAULT_TIMEOUT)
         with open(log_path, "w") as log:
             proc = subprocess.Popen(
                 agent_command(), cwd=path, stdin=subprocess.PIPE, stdout=log,
@@ -195,12 +229,16 @@ def execute_run(store, run):
                 return finish("stuck", "Agent killed after timeout (%s s)." % timeout)
         if code != 0:
             return finish("stuck", "Agent exited with code %s." % code)
+        result = parse_status(log_path)
+        extra = {"question": result["question"], "tests": result["tests"]}
+        if result["status"] == "stuck":
+            return finish("stuck", result["summary"], **extra)
         push = git(["push", "origin", branch], path)
         with open(log_path, "a") as log:
             log.write("\n[runner] git push origin %s:\n%s%s" % (branch, push.stdout, push.stderr))
         if push.returncode != 0:
-            return finish("stuck", "Agent exited 0 but git push failed.")
-        finish("done", "Agent exited 0; branch %s pushed." % branch)
+            return finish("stuck", "Agent reported %s but git push failed." % result["status"], **extra)
+        finish(result["status"], result["summary"], **extra)
     except Exception as e:  # keep the run from staying "running" forever
         finish("stuck", "Runner error: %s" % e)
 
