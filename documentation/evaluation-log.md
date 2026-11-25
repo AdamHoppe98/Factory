@@ -44,3 +44,25 @@ One entry per task that goes through the factory. This is the raw material for t
 - **Timeline:** Approved → WF2 v2 started run `ea86a86485ae` at 13:06 → `claude -p` wrote and committed the README (about a minute) → the runner parsed `done` and pushed → WF4 (activated later) opened PR #22 → `Your QA` at 13:16.
 - **Factory problem found:** n8n had been running old versions of WF1 and WF2 since the day before (draft vs. published, swapped on import). The old WF2 posted the manual command twice before the cause was found with the MCP. The T1.4 race fix had never been live. Fixed by creating fresh workflows from the repo JSON.
 - **Takeaway:** the automatic path works end to end. The weak spot was keeping n8n in sync with the repo, not the agent.
+
+| Date | Issue | Target | Basic A/B | Result | Questions asked | Where Adam stepped in | Notes |
+|---|---|---|---|---|---|---|---|
+| 2026-11-25 | #25 Runner docstring | factory | B | Merged (PR #26) | 1 (hand-made test question) | Answered the question. Approved nothing: WF1b moved it to Approved. | First question → answer → automatic rerun. About 2.5 min from answer to PR. |
+| 2026-11-25 | #28 PvP flag icon | projects/AdamAddon | B | Merged (PR #29) after 1 retry | 0 | Approved, re-approved after Stuck, merged. | First automatic AdamAddon run. Stuck on the commit (allowlist), fixed in the prompt. |
+| 2026-11-25 | #30 Runner reads prompt from origin/main | factory | B | Merged (PR #31) | 0 | Approved, merged, restarted the runner (twice). | Idea came from a gap found in #28. |
+
+### #25 – question → answer loop (T2.6 test)
+- Adam's answer → WF1b `Approved` (23 s) → WF2 v2 run (28 s) → `Your QA` with PR #26 (1 min 40 s). The agent used the answer (it listed defaults, as Adam asked). The setup (spec and question) was hand-made, and the rest was real.
+
+### #28 – PvP flag icon (first Basic B AdamAddon run)
+- **Timeline:** Ideas 13:55 → spec 13:56 (64 s) → Approved 13:58 → Building → **Stuck 14:00** → Adam re-approved 14:04 → Building → Your QA 14:05 (38 s, the agent only had to commit) → merged and Done 14:07.
+- **Spec (qwen3:8b):** usable, but the test command `/togglepvporp` was wrong. The agent noticed it and wrote `/togglepvp`.
+- **Run 1 stuck:** the agent built `Features/PvPFlag.lua`, but `git add`/`git commit` were denied, most likely because of a chained command (the allowlist only allows plain commands). It reported `stuck` instead of claiming success, and nothing half-done was pushed. Fix: `agent.md` now says exactly how to commit.
+- **Run 2:** reused the worktree, found its own uncommitted files and committed them. Done in 38 s.
+- **Not verified:** game API names (`UnitIsPVP`, `PLAYER_FLAGS_CHANGED`, badge textures), because the agent has no network and no copy of wow-ui-source. Adam's QA in game is the check. A T3.2 candidate: a read-only wow-ui-source in the container.
+- **Gap found:** the runner read `agent.md` from the local checkout, so a merged prompt change only applied after a manual pull. → #30.
+
+### #30 – runner reads the prompt from origin/main
+- **Timeline:** Ideas 14:09 → Your QA 14:13 → Done 14:14. Five minutes from idea to merge.
+- **After the merge:** the runner had to be restarted to load the new code. The first restart didn't pull (local `main` stayed behind), and the second with `scripts/start-runner.sh` did. Lesson: runner code changes need a pull plus a restart, and only the script does both.
+- **Takeaway for the report:** the factory improved itself from a problem it found in its own run (#28 → #30).

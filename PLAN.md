@@ -121,7 +121,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] **T2.5** WF4: collect results and open the PR, or post the question, or mark the task Stuck.
 - [x] **T2.6** WF1 v2: `Waiting for you` → `Approved` on Adam's answer. Pass the Q&A to the next run.
 - [x] **T2.7** Author filter: only Adam's issues and comments are processed.
-- [ ] **T2.8** Run real tasks through the automated factory, both factory tasks and AdamAddon tasks. Log them.
+- [x] **T2.8** Run real tasks through the automated factory, both factory tasks and AdamAddon tasks. Log them.
 
 ### Phase 3 – Advanced (assignment version 2)
 Required, in this order, after Basic B:
