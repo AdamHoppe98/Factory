@@ -116,7 +116,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 ### Phase 2 – Basic B (automated factory)
 - [x] **T2.1** Runner skeleton: HTTP API, in-memory and JSON-file run state, one run at a time, tests.
 - [ ] **T2.2** Runner execution: git worktree, `claude -p` with an allowlist, 30-minute timeout, branch push. Also from the #12 review: store `title`/`spec`/`qa` on `POST /runs`, and return 400 when `issue` is missing.
-- [ ] **T2.3** Runner result parsing for the status contract, plus tests with fake agent output.
+- [ ] **T2.3** Runner result parsing for the status contract, plus tests with fake agent output. Also from the #15 review: narrow `Bash(python3:*)`/`Bash(python:*)` in the allowlist to test commands (`python3 -m unittest`), since `python3 -c` can push or reach the network; rename `TEST_AGENT_CMD`/`TEST_TIMEOUT` to `RUNNER_AGENT_CMD`/`RUNNER_TIMEOUT`.
 - [ ] **T2.4** WF2 v2: call `POST /runs`.
 - [ ] **T2.5** WF4: collect results and open the PR, or post the question, or mark the task Stuck.
 - [ ] **T2.6** WF1 v2: `Waiting for you` → `Approved` on Adam's answer. Pass the Q&A to the next run.
